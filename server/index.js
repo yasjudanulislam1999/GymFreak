@@ -1,13 +1,13 @@
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const { Pool } = require('pg');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
-const axios = require('axios');
-const OpenAI = require('openai');
-require('dotenv').config();
+const express = require('../../node_modules/express');
+const cors = require('../../node_modules/cors');
+const bodyParser = require('../../node_modules/body-parser');
+const { Pool } = require('../../node_modules/pg');
+const bcrypt = require('../../node_modules/bcryptjs');
+const jwt = require('../../node_modules/jsonwebtoken');
+const { v4: uuidv4 } = require('../../node_modules/uuid');
+const axios = require('../../node_modules/axios');
+const OpenAI = require('../../node_modules/openai');
+require('../../node_modules/dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5001;

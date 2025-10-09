@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     buildCommand: npm run build
-    startCommand: npm run start:prod
+    startCommand: node server/index.js
     envVars:
       - key: NODE_ENV
         value: production
