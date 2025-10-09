@@ -3,8 +3,8 @@ services:
     name: gymfreak-app
     env: node
     plan: free
-    buildCommand: npm run build
-    startCommand: npm run server
+    buildCommand: cd client && npm install && npm run build
+    startCommand: cd server && npm install && npm start
     envVars:
       - key: NODE_ENV
         value: production
