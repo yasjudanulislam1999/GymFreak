@@ -8,7 +8,7 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && npm start",
     "client": "cd client && npm start",
-    "build": "cd client && npm install && npm run build",
+    "build": "cd client && npm install && npm run build && cd ../server && npm install",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install",
     "stop": "pkill -f 'node.*index.js' && pkill -f 'react-scripts'",
     "start:prod": "NODE_PATH=./node_modules node server/index.js"
