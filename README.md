@@ -1,143 +1,132 @@
-# GymFreak - Fitness & Nutrition Tracker
+# 🏋️‍♂️ GymFreak - AI-Powered Fitness & Nutrition App
 
-A platform-independent web application for tracking Total Daily Energy Expenditure (TDEE) and meal logging.
+A comprehensive platform-independent fitness and nutrition tracking application with AI-powered features for personalized health and wellness management.
 
-## Features
+![GymFreak App](https://img.shields.io/badge/React-18.2.0-blue) ![Node.js](https://img.shields.io/badge/Node.js-18.0.0-green) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15.0-blue) ![OpenAI](https://img.shields.io/badge/OpenAI-GPT--3.5--turbo-purple)
 
-- **TDEE Calculation**: Calculate your Total Daily Energy Expenditure based on height, weight, age, gender, and activity level
-- **Meal Logging**: Log your meals with detailed nutritional information
-- **Nutrition Tracking**: View comprehensive nutrition summaries with charts and progress tracking
-- **User Profiles**: Manage your personal information and fitness goals
-- **Responsive Design**: Works seamlessly across desktop, tablet, and mobile devices
+## ✨ Features
 
-## Technology Stack
+### 🔐 User Management
+- **Secure Authentication**: JWT-based user registration and login
+- **Profile Management**: Complete user profile with height, weight, age, gender, and activity level
+- **Data Persistence**: PostgreSQL database for reliable data storage
+
+### 🧮 Advanced TDEE Calculation
+- **Mifflin-St Jeor Equation**: Scientifically accurate BMR and TDEE calculation
+- **Gender-Specific Formulas**: Different calculations for men and women
+- **Activity Level Integration**: 5 different activity levels for precise calorie needs
+
+### 🍎 Smart Meal Logging
+- **AI-Powered Food Recognition**: OpenAI integration for intelligent food identification
+- **Nutritional Analysis**: Automatic calorie and macro extraction from food descriptions
+- **Unit Conversion**: Smart quantity and unit handling (grams, cups, pieces, etc.)
+- **Meal Categories**: Breakfast, lunch, dinner, and snacks tracking
+
+### 🤖 AI Coach & Diet Planning
+- **Personalized AI Coach**: OpenAI-powered chatbot for nutrition advice
+- **Real-time Calorie Balance**: Live tracking of consumed vs remaining calories
+- **Diet Plan Generation**: Customized meal plans based on user goals
+- **WhatsApp-style Chat Interface**: Modern dark theme with excellent UX
+
+### 📊 Analytics & Tracking
+- **Daily Nutrition Summary**: Comprehensive overview of daily intake
+- **Macro Tracking**: Protein, carbs, and fat monitoring
+- **Progress Visualization**: Clear charts and progress indicators
+- **Historical Data**: Track your nutrition journey over time
+
+## 🛠️ Tech Stack
 
 ### Frontend
-- React 18 with TypeScript
-- React Router for navigation
-- Axios for API calls
-- Recharts for data visualization
-- Lucide React for icons
-- CSS3 with modern styling
+- **React 18.2.0** with TypeScript
+- **Modern UI Components** with Lucide React icons
+- **Responsive Design** with CSS Grid and Flexbox
+- **Dark Theme** with glassmorphism effects
 
 ### Backend
-- Node.js with Express
-- SQLite database
-- JWT authentication
-- bcryptjs for password hashing
-- CORS enabled for cross-origin requests
+- **Node.js 18.0.0** with Express.js
+- **PostgreSQL** database with Neon cloud hosting
+- **JWT Authentication** for secure user sessions
+- **RESTful API** design
 
-## Installation
+### AI Integration
+- **OpenAI GPT-3.5-turbo** for intelligent responses
+- **Edamam Food Database API** for nutrition data
+- **Smart Food Recognition** with fallback mock data
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18.0.0 or higher
+- PostgreSQL database (or use Neon cloud)
+- OpenAI API key
+
+### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd GymFreakApp
+   git clone https://github.com/yasjudanulislam1999/GymFreak.git
+   cd GymFreak
    ```
 
 2. **Install dependencies**
    ```bash
-   npm run install-all
+   # Install root dependencies
+   npm install
+   
+   # Install client dependencies
+   cd client
+   npm install
+   
+   # Install server dependencies
+   cd ../server
+   npm install
    ```
 
-3. **Start the development servers**
+3. **Set up environment variables**
+   
+   Create a `.env` file in the `server` directory:
+   ```env
+   DATABASE_URL=your_postgresql_connection_string
+   JWT_SECRET=your_jwt_secret_key
+   OPENAI_API_KEY=your_openai_api_key
+   EDAMAM_APP_ID=your_edamam_app_id
+   EDAMAM_APP_KEY=your_edamam_app_key
+   PORT=5001
+   ```
+
+4. **Run the application**
    ```bash
-   npm run dev
+   # Start the server (from server directory)
+   npm start
+   
+   # Start the client (from client directory)
+   npm start
    ```
 
-   This will start both the backend server (port 5000) and frontend development server (port 3000).
+5. **Access the application**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:5001
 
-## Usage
+## 📱 Usage
 
-1. **Register**: Create a new account with your personal information
-2. **Complete Profile**: Add your height, weight, age, gender, and activity level for accurate TDEE calculation
-3. **Log Meals**: Search for foods in the database and log your meals with quantities
-4. **Track Progress**: View your daily nutrition summary and progress towards your calorie goals
+### Getting Started
+1. **Register** a new account or **login** with existing credentials
+2. **Complete your profile** with height, weight, age, gender, and activity level
+3. **Start logging meals** using the AI-powered food recognition
+4. **Chat with your AI Coach** for personalized nutrition advice
+5. **Generate diet plans** based on your fitness goals
 
-## API Endpoints
+### Key Features
+- **Meal Logging**: Use AI to identify foods and automatically extract nutritional information
+- **AI Coach**: Get personalized advice on nutrition, meal planning, and fitness goals
+- **Diet Planning**: Generate custom meal plans for weight loss, maintenance, or weight gain
+- **Real-time Tracking**: Monitor your daily calorie balance and macro intake
 
-### Authentication
-- `POST /api/register` - User registration
-- `POST /api/login` - User login
-- `GET /api/profile` - Get user profile and TDEE
+## 🏗️ Project Structure
 
-### Profile Management
-- `PUT /api/profile` - Update user profile
-
-### Food Database
-- `GET /api/foods` - Search food database
-
-### Meal Logging
-- `POST /api/meals` - Log a new meal
-- `GET /api/meals` - Get user's meals
-- `DELETE /api/meals/:id` - Delete a meal
-
-### Nutrition
-- `GET /api/nutrition/summary` - Get daily nutrition summary
-
-## TDEE Calculation
-
-The app uses the Mifflin-St Jeor equation to calculate TDEE:
-
-**For Men:**
-BMR = (10 × weight in kg) + (6.25 × height in cm) - (5 × age in years) + 5
-
-**For Women:**
-BMR = (10 × weight in kg) + (6.25 × height in cm) - (5 × age in years) - 161
-
-**TDEE = BMR × Activity Multiplier**
-
-Activity Multipliers:
-- Sedentary: 1.2
-- Light: 1.375
-- Moderate: 1.55
-- Active: 1.725
-- Very Active: 1.9
-
-## Database Schema
-
-### Users Table
-- id (TEXT PRIMARY KEY)
-- email (TEXT UNIQUE)
-- password (TEXT)
-- name (TEXT)
-- height (REAL)
-- weight (REAL)
-- age (INTEGER)
-- gender (TEXT)
-- activity_level (TEXT)
-- created_at (DATETIME)
-
-### Meals Table
-- id (TEXT PRIMARY KEY)
-- user_id (TEXT)
-- name (TEXT)
-- calories (INTEGER)
-- protein (REAL)
-- carbs (REAL)
-- fat (REAL)
-- quantity (REAL)
-- unit (TEXT)
-- meal_type (TEXT)
-- date (TEXT)
-- created_at (DATETIME)
-
-### Food Database Table
-- id (TEXT PRIMARY KEY)
-- name (TEXT)
-- calories_per_100g (INTEGER)
-- protein_per_100g (REAL)
-- carbs_per_100g (REAL)
-- fat_per_100g (REAL)
-- category (TEXT)
-
-## Development
-
-### Project Structure
 ```
-GymFreakApp/
+GymFreak/
 ├── client/                 # React frontend
-│   ├── public/
 │   ├── src/
 │   │   ├── components/     # React components
 │   │   ├── contexts/       # React contexts
@@ -145,30 +134,66 @@ GymFreakApp/
 │   └── package.json
 ├── server/                 # Node.js backend
 │   ├── index.js           # Main server file
-│   └── package.json
-└── package.json           # Root package.json
+│   ├── package.json
+│   └── .env               # Environment variables
+├── .gitignore
+└── README.md
 ```
 
-### Available Scripts
+## 🔧 API Endpoints
 
-- `npm run dev` - Start both frontend and backend in development mode
-- `npm run client` - Start only the frontend
-- `npm run server` - Start only the backend
-- `npm run build` - Build the frontend for production
-- `npm start` - Start the production server
+### Authentication
+- `POST /api/register` - User registration
+- `POST /api/login` - User login
+- `GET /api/profile` - Get user profile
 
-## Contributing
+### Meals
+- `POST /api/meals` - Log a meal
+- `GET /api/meals` - Get user's meals
+- `DELETE /api/meals/:id` - Delete a meal
+
+### AI Features
+- `POST /api/ai/recognize-food` - AI food recognition
+- `POST /api/ai/coach-response` - AI coach responses
+- `POST /api/ai/diet-plan` - Generate diet plan
+- `GET /api/ai/nutrition-summary` - Get nutrition summary
+
+### Chat
+- `GET /api/chat/messages` - Get chat history
+- `POST /api/chat/messages` - Save chat message
+- `DELETE /api/chat/messages` - Clear chat history
+
+## 🎨 UI/UX Features
+
+- **Dark Theme**: Modern dark interface with gradient backgrounds
+- **WhatsApp-style Chat**: Intuitive chat interface with proper message positioning
+- **Glassmorphism Effects**: Beautiful translucent cards and elements
+- **Responsive Design**: Works perfectly on desktop and mobile devices
+- **Smooth Animations**: Engaging micro-interactions and transitions
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## 🙏 Acknowledgments
 
-For support or questions, please open an issue in the repository.
+- OpenAI for providing the AI capabilities
+- Edamam for nutrition database API
+- Neon for PostgreSQL hosting
+- React and Node.js communities for excellent documentation
+
+## 📞 Support
+
+If you have any questions or need help, please open an issue on GitHub or contact the development team.
+
+---
+
+**Made with ❤️ by [Yasjudanul Islam](https://github.com/yasjudanulislam1999)**
