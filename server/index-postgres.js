@@ -1,0 +1,703 @@
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
+const axios = require('axios');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 5001;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+
+// Database setup
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+// Test database connection
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('Error connecting to database:', err);
+  } else {
+    console.log('Connected to Neon PostgreSQL database');
+    release();
+  }
+});
+
+// Initialize database tables
+const initializeDatabase = async () => {
+  try {
+    // Users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE,
+        password TEXT,
+        name TEXT,
+        height REAL,
+        weight REAL,
+        age INTEGER,
+        gender TEXT,
+        activity_level TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Meals table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS meals (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        name TEXT,
+        calories INTEGER,
+        protein REAL,
+        carbs REAL,
+        fat REAL,
+        quantity REAL,
+        unit TEXT,
+        meal_type TEXT,
+        date TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+      )
+    `);
+
+    // Chat messages table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        message TEXT NOT NULL,
+        sender TEXT NOT NULL,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+      )
+    `);
+
+    // Food database table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS food_database (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        calories_per_100g INTEGER,
+        protein_per_100g REAL,
+        carbs_per_100g REAL,
+        fat_per_100g REAL,
+        category TEXT
+      )
+    `);
+
+    // Insert sample food data
+    const sampleFoods = [
+      ['food-1', 'Chicken Breast', 165, 31, 0, 3.6, 'Protein'],
+      ['food-2', 'Brown Rice', 111, 2.6, 23, 0.9, 'Carbohydrate'],
+      ['food-3', 'Salmon', 208, 25, 0, 12, 'Protein'],
+      ['food-4', 'Broccoli', 34, 2.8, 7, 0.4, 'Vegetable'],
+      ['food-5', 'Eggs', 155, 13, 1.1, 11, 'Protein'],
+      ['food-6', 'Oatmeal', 68, 2.4, 12, 1.4, 'Carbohydrate'],
+      ['food-7', 'Banana', 89, 1.1, 23, 0.3, 'Fruit'],
+      ['food-8', 'Almonds', 579, 21, 22, 50, 'Fat'],
+      ['food-9', 'Greek Yogurt', 59, 10, 3.6, 0.4, 'Protein'],
+      ['food-10', 'Sweet Potato', 86, 1.6, 20, 0.1, 'Carbohydrate']
+    ];
+
+    for (const food of sampleFoods) {
+      await pool.query(`
+        INSERT INTO food_database 
+        (id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, category) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (id) DO NOTHING
+      `, food);
+    }
+
+    console.log('Database tables initialized successfully');
+  } catch (error) {
+    console.error('Error initializing database:', error);
+  }
+};
+
+// Initialize database on startup
+initializeDatabase();
+
+// TDEE calculation function
+function calculateTDEE(height, weight, age, gender, activityLevel) {
+  // Calculate BMR using Mifflin-St Jeor Equation
+  let bmr;
+  if (gender.toLowerCase() === 'male') {
+    bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+  } else {
+    bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
+  }
+
+  // Activity multipliers
+  const activityMultipliers = {
+    'sedentary': 1.2,
+    'light': 1.375,
+    'moderate': 1.55,
+    'active': 1.725,
+    'very_active': 1.9
+  };
+
+  const tdee = bmr * (activityMultipliers[activityLevel] || 1.2);
+  return Math.round(tdee);
+}
+
+// AI Food Recognition using Edamam API
+async function recognizeFoodWithAI(foodDescription) {
+  try {
+    // Using Edamam Food Database API (free tier)
+    const APP_ID = process.env.EDAMAM_APP_ID || 'your-app-id';
+    const APP_KEY = process.env.EDAMAM_APP_KEY || 'your-app-key';
+    
+    // For demo purposes, we'll use a mock response if no API keys are provided
+    if (APP_ID === 'your-app-id' || APP_KEY === 'your-app-key') {
+      return mockFoodRecognition(foodDescription);
+    }
+
+    const response = await axios.get('https://api.edamam.com/api/food-database/v2/parser', {
+      params: {
+        q: foodDescription,
+        app_id: APP_ID,
+        app_key: APP_KEY,
+        limit: 1
+      }
+    });
+
+    if (response.data.hints && response.data.hints.length > 0) {
+      const food = response.data.hints[0].food;
+      const nutrients = food.nutrients;
+      
+      return {
+        name: food.label,
+        calories: Math.round(nutrients.ENERC_KCAL || 0),
+        protein: Math.round((nutrients.PROCNT || 0) * 10) / 10,
+        carbs: Math.round((nutrients.CHOCDF || 0) * 10) / 10,
+        fat: Math.round((nutrients.FAT || 0) * 10) / 10,
+        confidence: 'high',
+        source: 'edamam'
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('AI Food Recognition Error:', error.message);
+    return mockFoodRecognition(foodDescription);
+  }
+}
+
+// Mock food recognition for demo purposes
+function mockFoodRecognition(foodDescription) {
+  const lowerDescription = foodDescription.toLowerCase();
+  
+  // Parse quantity and unit from description
+  const quantityMatch = lowerDescription.match(/^(\d+(?:\.\d+)?)\s*(.*)/);
+  let quantity = 1;
+  let unit = 'piece';
+  let cleanDescription = foodDescription;
+  
+  if (quantityMatch) {
+    quantity = parseFloat(quantityMatch[1]);
+    cleanDescription = quantityMatch[2];
+    
+    // Check for specific units in the description
+    if (cleanDescription.includes('cup') || cleanDescription.includes('cups')) {
+      unit = 'cup';
+    } else if (cleanDescription.includes('tbsp') || cleanDescription.includes('tablespoon')) {
+      unit = 'tbsp';
+    } else if (cleanDescription.includes('tsp') || cleanDescription.includes('teaspoon')) {
+      unit = 'tsp';
+    } else if (cleanDescription.includes('slice') || cleanDescription.includes('slices')) {
+      unit = 'slice';
+    } else if (cleanDescription.includes('gram') || cleanDescription.includes('grams') || cleanDescription.includes('g ')) {
+      unit = 'g';
+    } else if (cleanDescription.includes('kg') || cleanDescription.includes('kilogram')) {
+      unit = 'kg';
+    } else if (cleanDescription.includes('oz') || cleanDescription.includes('ounce')) {
+      unit = 'oz';
+    } else if (cleanDescription.includes('lb') || cleanDescription.includes('pound')) {
+      unit = 'lb';
+    } else {
+      // Determine unit based on quantity and food type
+      if (quantity === 1) {
+        unit = 'piece';
+      } else if (quantity < 1) {
+        unit = 'g';
+      } else {
+        // Check if it's a countable item
+        const countableItems = ['apple', 'banana', 'orange', 'egg', 'bread', 'potato', 'tomato', 'onion', 'chicken', 'fish', 'beef'];
+        const isCountable = countableItems.some(item => cleanDescription.includes(item));
+        unit = isCountable ? 'piece' : 'g';
+      }
+    }
+  }
+  
+  // Simple keyword matching for demo
+  const foodDatabase = {
+    'chicken': { calories: 165, protein: 31, carbs: 0, fat: 3.6 },
+    'rice': { calories: 111, protein: 2.6, carbs: 23, fat: 0.9 },
+    'pasta': { calories: 131, protein: 5, carbs: 25, fat: 1.1 },
+    'bolognese': { calories: 200, protein: 12, carbs: 20, fat: 8 },
+    'burger': { calories: 350, protein: 25, carbs: 30, fat: 15 },
+    'pizza': { calories: 300, protein: 12, carbs: 35, fat: 12 },
+    'eggs': { calories: 155, protein: 13, carbs: 1.1, fat: 11 },
+    'banana': { calories: 89, protein: 1.1, carbs: 23, fat: 0.3 },
+    'apple': { calories: 52, protein: 0.3, carbs: 14, fat: 0.2 },
+    'orange': { calories: 47, protein: 0.9, carbs: 12, fat: 0.1 },
+    'potato': { calories: 77, protein: 2, carbs: 17, fat: 0.1 }
+  };
+
+  // Find matching food
+  for (const [key, nutrition] of Object.entries(foodDatabase)) {
+    if (cleanDescription.includes(key)) {
+      return {
+        name: cleanDescription,
+        calories: nutrition.calories,
+        protein: nutrition.protein,
+        carbs: nutrition.carbs,
+        fat: nutrition.fat,
+        confidence: 'medium',
+        source: 'mock',
+        quantity: quantity,
+        unit: unit
+      };
+    }
+  }
+
+  // Default fallback
+  return {
+    name: cleanDescription,
+    calories: 100,
+    protein: 5,
+    carbs: 15,
+    fat: 3,
+    confidence: 'low',
+    source: 'fallback',
+    quantity: quantity,
+    unit: unit
+  };
+}
+
+// Authentication middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Routes
+
+// Register
+app.post('/api/register', async (req, res) => {
+  try {
+    const { email, password, name, height, weight, age, gender, activityLevel } = req.body;
+
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Email, password, and name are required' });
+    }
+
+    // Check if user already exists
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = uuidv4();
+
+    await pool.query(
+      `INSERT INTO users (id, email, password, name, height, weight, age, gender, activity_level) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [userId, email, hashedPassword, name, height, weight, age, gender, activityLevel]
+    );
+
+    const token = jwt.sign({ userId, email }, JWT_SECRET, { expiresIn: '24h' });
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: { id: userId, email, name, height, weight, age, gender, activityLevel }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Login
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        height: user.height,
+        weight: user.weight,
+        age: user.age,
+        gender: user.gender,
+        activityLevel: user.activity_level
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Get user profile
+app.get('/api/profile', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.userId]);
+    const user = result.rows[0];
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const tdee = calculateTDEE(user.height, user.weight, user.age, user.gender, user.activity_level);
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      height: user.height,
+      weight: user.weight,
+      age: user.age,
+      gender: user.gender,
+      activityLevel: user.activity_level,
+      tdee
+    });
+  } catch (error) {
+    console.error('Profile fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// Update user profile
+app.put('/api/profile', authenticateToken, async (req, res) => {
+  try {
+    const { name, height, weight, age, gender, activityLevel } = req.body;
+
+    await pool.query(
+      `UPDATE users 
+       SET name = $1, height = $2, weight = $3, age = $4, gender = $5, activity_level = $6 
+       WHERE id = $7`,
+      [name, height, weight, age, gender, activityLevel, req.user.userId]
+    );
+
+    res.json({ message: 'Profile updated successfully' });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// Get food database
+app.get('/api/foods', async (req, res) => {
+  try {
+    const { search } = req.query;
+    let query = 'SELECT * FROM food_database';
+    let params = [];
+
+    if (search) {
+      query += ' WHERE name ILIKE $1';
+      params.push(`%${search}%`);
+    }
+
+    query += ' ORDER BY name';
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Food database error:', error);
+    res.status(500).json({ error: 'Failed to fetch foods' });
+  }
+});
+
+// AI Food Recognition endpoint
+app.post('/api/ai/recognize-food', async (req, res) => {
+  try {
+    const { foodDescription } = req.body;
+    if (!foodDescription || foodDescription.trim().length === 0) {
+      return res.status(400).json({ error: 'Food description is required' });
+    }
+    const result = await recognizeFoodWithAI(foodDescription.trim());
+    if (!result) {
+      return res.status(404).json({ error: 'Could not recognize food item' });
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('AI Food Recognition Error:', error);
+    res.status(500).json({ error: 'AI recognition failed' });
+  }
+});
+
+// Log meal
+app.post('/api/meals', authenticateToken, async (req, res) => {
+  try {
+    const { name, calories, protein, carbs, fat, quantity, unit, mealType } = req.body;
+    const mealId = uuidv4();
+    const today = new Date().toISOString().split('T')[0];
+
+    await pool.query(
+      `INSERT INTO meals (id, user_id, name, calories, protein, carbs, fat, quantity, unit, meal_type, date) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [mealId, req.user.userId, name, calories, protein, carbs, fat, quantity, unit, mealType, today]
+    );
+
+    res.json({ message: 'Meal logged successfully' });
+  } catch (error) {
+    console.error('Meal logging error:', error);
+    res.status(500).json({ error: 'Failed to log meal' });
+  }
+});
+
+// Get meals
+app.get('/api/meals', authenticateToken, async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    const result = await pool.query(
+      'SELECT * FROM meals WHERE user_id = $1 AND date = $2 ORDER BY created_at DESC',
+      [req.user.userId, targetDate]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Meals fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch meals' });
+  }
+});
+
+// Get nutrition summary
+app.get('/api/nutrition/summary', authenticateToken, async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    const result = await pool.query(
+      `SELECT 
+        SUM(calories) as total_calories,
+        SUM(protein) as total_protein,
+        SUM(carbs) as total_carbs,
+        SUM(fat) as total_fat
+       FROM meals 
+       WHERE user_id = $1 AND date = $2`,
+      [req.user.userId, targetDate]
+    );
+
+    const summary = result.rows[0];
+    res.json({
+      date: targetDate,
+      total_calories: summary.total_calories || 0,
+      total_protein: summary.total_protein || 0,
+      total_carbs: summary.total_carbs || 0,
+      total_fat: summary.total_fat || 0
+    });
+  } catch (error) {
+    console.error('Nutrition summary error:', error);
+    res.status(500).json({ error: 'Failed to fetch nutrition summary' });
+  }
+});
+
+// Delete a meal
+app.delete('/api/meals/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      'DELETE FROM meals WHERE id = $1 AND user_id = $2',
+      [id, req.user.userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Meal not found' });
+    }
+
+    res.json({ message: 'Meal deleted successfully' });
+  } catch (error) {
+    console.error('Meal deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete meal' });
+  }
+});
+
+// Chat Messages API
+
+// Get chat messages for a user
+app.get('/api/chat/messages', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM chat_messages WHERE user_id = $1 ORDER BY timestamp ASC',
+      [req.user.userId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: 'Failed to fetch chat messages' });
+  }
+});
+
+// Save a chat message
+app.post('/api/chat/messages', authenticateToken, async (req, res) => {
+  try {
+    const { message, sender } = req.body;
+    const userId = req.user.userId;
+    const messageId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    
+    if (!message || !sender) {
+      return res.status(400).json({ error: 'Message and sender are required' });
+    }
+    
+    const result = await pool.query(
+      'INSERT INTO chat_messages (id, user_id, message, sender) VALUES ($1, $2, $3, $4) RETURNING *',
+      [messageId, userId, message, sender]
+    );
+    
+    res.json({ 
+      id: messageId, 
+      message, 
+      sender, 
+      timestamp: result.rows[0].timestamp
+    });
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: 'Failed to save message' });
+  }
+});
+
+// Delete all chat messages for a user (optional cleanup endpoint)
+app.delete('/api/chat/messages', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM chat_messages WHERE user_id = $1',
+      [req.user.userId]
+    );
+    res.json({ message: 'All chat messages deleted successfully' });
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: 'Failed to delete messages' });
+  }
+});
+
+// Get current day's nutrition summary for AI Coach
+app.get('/api/ai/nutrition-summary', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Get user's TDEE first
+    const userResult = await pool.query(
+      'SELECT height, weight, age, gender, activity_level FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Calculate TDEE
+    let bmr;
+    if (user.gender.toLowerCase() === 'male') {
+      bmr = (10 * user.weight) + (6.25 * user.height) - (5 * user.age) + 5;
+    } else {
+      bmr = (10 * user.weight) + (6.25 * user.height) - (5 * user.age) - 161;
+    }
+    
+    const activityMultipliers = {
+      'sedentary': 1.2,
+      'light': 1.375,
+      'moderate': 1.55,
+      'active': 1.725,
+      'very_active': 1.9
+    };
+    
+    const tdee = Math.round(bmr * (activityMultipliers[user.activity_level] || 1.2));
+    
+    // Get today's meals
+    const mealsResult = await pool.query(
+      'SELECT * FROM meals WHERE user_id = $1 AND date = $2',
+      [userId, today]
+    );
+    
+    const meals = mealsResult.rows;
+    const totalCalories = meals.reduce((sum, meal) => sum + (meal.calories || 0), 0);
+    const totalProtein = meals.reduce((sum, meal) => sum + (meal.protein || 0), 0);
+    const totalCarbs = meals.reduce((sum, meal) => sum + (meal.carbs || 0), 0);
+    const totalFat = meals.reduce((sum, meal) => sum + (meal.fat || 0), 0);
+    
+    res.json({
+      tdee,
+      consumed: {
+        calories: totalCalories,
+        protein: Math.round(totalProtein * 10) / 10,
+        carbs: Math.round(totalCarbs * 10) / 10,
+        fat: Math.round(totalFat * 10) / 10
+      },
+      remaining: {
+        calories: Math.max(0, tdee - totalCalories),
+        protein: Math.max(0, Math.round((user.weight * 1.6 - totalProtein) * 10) / 10),
+        carbs: Math.max(0, Math.round((tdee * 0.45 / 4 - totalCarbs) * 10) / 10),
+        fat: Math.max(0, Math.round((tdee * 0.25 / 9 - totalFat) * 10) / 10)
+      },
+      progress: {
+        calories: Math.round((totalCalories / tdee) * 100),
+        protein: Math.round((totalProtein / (user.weight * 1.6)) * 100),
+        carbs: Math.round((totalCarbs / (tdee * 0.45 / 4)) * 100),
+        fat: Math.round((totalFat / (tdee * 0.25 / 9)) * 100)
+      }
+    });
+  } catch (error) {
+    console.error('Nutrition summary error:', error);
+    res.status(500).json({ error: 'Failed to fetch nutrition summary' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

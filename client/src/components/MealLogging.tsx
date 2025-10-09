@@ -1,0 +1,450 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Search, Plus, Trash2, Clock, Utensils, Sparkles, Loader } from 'lucide-react';
+
+interface Food {
+  id: string;
+  name: string;
+  calories_per_100g: number;
+  protein_per_100g: number;
+  carbs_per_100g: number;
+  fat_per_100g: number;
+  category: string;
+}
+
+interface Meal {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  quantity: number;
+  unit: string;
+  meal_type: string;
+  date: string;
+  created_at: string;
+}
+
+const MealLogging: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [foodResults, setFoodResults] = useState<Food[]>([]);
+  const [selectedFood, setSelectedFood] = useState<Food | null>(null);
+  const [quantity, setQuantity] = useState('');
+  const [unit, setUnit] = useState('g');
+  const [mealType, setMealType] = useState('breakfast');
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  
+  // AI Recognition states
+  const [aiInput, setAiInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<any>(null);
+  const [showAiSection, setShowAiSection] = useState(false);
+
+  useEffect(() => {
+    fetchMeals();
+  }, []);
+
+  const fetchMeals = async () => {
+    try {
+      const response = await axios.get('/api/meals');
+      setMeals(response.data);
+    } catch (error) {
+      console.error('Error fetching meals:', error);
+    }
+  };
+
+  const searchFoods = async (query: string) => {
+    if (query.length < 2) {
+      setFoodResults([]);
+      return;
+    }
+
+    try {
+      const response = await axios.get(`/api/foods?search=${encodeURIComponent(query)}`);
+      setFoodResults(response.data);
+    } catch (error) {
+      console.error('Error searching foods:', error);
+    }
+  };
+
+  const recognizeFoodWithAI = async () => {
+    if (!aiInput.trim()) return;
+
+    setAiLoading(true);
+    setAiResult(null);
+
+    try {
+      const response = await axios.post('/api/ai/recognize-food', {
+        foodDescription: aiInput
+      });
+      setAiResult(response.data);
+    } catch (error: any) {
+      setMessage('AI recognition failed: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const useAIResult = () => {
+    if (aiResult) {
+      setSelectedFood({
+        id: 'ai-' + Date.now(),
+        name: aiResult.name,
+        calories_per_100g: aiResult.calories,
+        protein_per_100g: aiResult.protein,
+        carbs_per_100g: aiResult.carbs,
+        fat_per_100g: aiResult.fat,
+        category: 'AI Recognized'
+      });
+      
+      // Use AI-detected quantity and unit
+      setQuantity(aiResult.quantity ? aiResult.quantity.toString() : '100');
+      setUnit(aiResult.unit || 'g');
+      
+      setShowAiSection(false);
+      setAiInput('');
+      setAiResult(null);
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    searchFoods(value);
+  };
+
+  const selectFood = (food: Food) => {
+    setSelectedFood(food);
+    setSearchTerm(food.name);
+    setFoodResults([]);
+  };
+
+  const logMeal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFood || !quantity) return;
+
+    setLoading(true);
+    setMessage('');
+
+    try {
+      const quantityNum = parseFloat(quantity);
+      let multiplier = quantityNum / 100; // Default: assume quantity is in grams
+
+      // Handle different units
+      switch (unit) {
+        case 'piece':
+        case 'slice':
+          // For countable items, use the quantity directly (not per 100g)
+          multiplier = quantityNum;
+          break;
+        case 'cup':
+          // Approximate: 1 cup ≈ 150g for most foods
+          multiplier = quantityNum * 1.5;
+          break;
+        case 'tbsp':
+          // Approximate: 1 tbsp ≈ 15g
+          multiplier = quantityNum * 0.15;
+          break;
+        case 'tsp':
+          // Approximate: 1 tsp ≈ 5g
+          multiplier = quantityNum * 0.05;
+          break;
+        case 'kg':
+          // 1 kg = 1000g
+          multiplier = quantityNum * 10;
+          break;
+        case 'oz':
+          // 1 oz ≈ 28g
+          multiplier = quantityNum * 0.28;
+          break;
+        case 'lb':
+          // 1 lb ≈ 454g
+          multiplier = quantityNum * 4.54;
+          break;
+        case 'g':
+        default:
+          // Already in grams, divide by 100 to get per-100g multiplier
+          multiplier = quantityNum / 100;
+          break;
+      }
+
+      const mealData = {
+        name: selectedFood.name,
+        calories: Math.round(selectedFood.calories_per_100g * multiplier),
+        protein: Math.round(selectedFood.protein_per_100g * multiplier * 10) / 10,
+        carbs: Math.round(selectedFood.carbs_per_100g * multiplier * 10) / 10,
+        fat: Math.round(selectedFood.fat_per_100g * multiplier * 10) / 10,
+        quantity: quantityNum,
+        unit: unit,
+        mealType: mealType,
+        date: new Date().toISOString().split('T')[0]
+      };
+
+      await axios.post('/api/meals', mealData);
+      setMessage('Meal logged successfully!');
+      setSelectedFood(null);
+      setSearchTerm('');
+      setQuantity('');
+      fetchMeals();
+    } catch (error: any) {
+      setMessage('Error logging meal: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteMeal = async (mealId: string) => {
+    if (!window.confirm('Are you sure you want to delete this meal?')) return;
+
+    try {
+      await axios.delete(`/api/meals/${mealId}`);
+      setMeals(meals.filter(meal => meal.id !== mealId));
+      setMessage('Meal deleted successfully!');
+    } catch (error: any) {
+      setMessage('Error deleting meal: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <div>
+      <h1 className="text-center mb-4">Meal Logging</h1>
+
+      {/* Log New Meal */}
+      <div className="card">
+        <h3 className="mb-4">
+          <Plus size={24} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          Log New Meal
+        </h3>
+
+        {message && (
+          <div className={message.includes('Error') ? 'error-message' : 'success-message'}>
+            {message}
+          </div>
+        )}
+
+        {/* AI Food Recognition Section */}
+        <div className="card" style={{ marginBottom: '20px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+          <div className="flex flex-between mb-4">
+            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
+              <Sparkles size={24} style={{ marginRight: '8px' }} />
+              AI Food Recognition
+            </h3>
+            <button
+              type="button"
+              onClick={() => setShowAiSection(!showAiSection)}
+              className="btn"
+              style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)' }}
+            >
+              {showAiSection ? 'Hide' : 'Show'} AI
+            </button>
+          </div>
+          
+          {showAiSection && (
+            <div>
+              <p style={{ marginBottom: '16px', opacity: 0.9 }}>
+                Describe your food in natural language and let AI extract the nutritional information!
+              </p>
+              
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="form-input"
+                  value={aiInput}
+                  onChange={(e) => setAiInput(e.target.value)}
+                  placeholder="e.g., 'grilled chicken breast with rice and broccoli'"
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={recognizeFoodWithAI}
+                  disabled={aiLoading || !aiInput.trim()}
+                  className="btn"
+                  style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)' }}
+                >
+                  {aiLoading ? <Loader size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                  {aiLoading ? 'Analyzing...' : 'Recognize'}
+                </button>
+              </div>
+
+              {aiResult && (
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '16px', 
+                  background: 'rgba(255,255,255,0.1)', 
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}>
+                  <h4 style={{ margin: '0 0 12px 0' }}>AI Recognition Result</h4>
+                  <div className="grid grid-2" style={{ marginBottom: '12px' }}>
+                    <div><strong>Food:</strong> {aiResult.name}</div>
+                    <div><strong>Quantity:</strong> {aiResult.quantity} {aiResult.unit}</div>
+                    <div><strong>Calories:</strong> {aiResult.calories} cal</div>
+                    <div><strong>Protein:</strong> {aiResult.protein}g</div>
+                    <div><strong>Carbs:</strong> {aiResult.carbs}g</div>
+                    <div><strong>Fat:</strong> {aiResult.fat}g</div>
+                    <div><strong>Confidence:</strong> {aiResult.confidence}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={useAIResult}
+                    className="btn"
+                    style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)' }}
+                  >
+                    Use This Food
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <form onSubmit={logMeal}>
+          <div className="form-group">
+            <label className="form-label">Search Food Database</label>
+            <div className="food-search">
+              <input
+                type="text"
+                className="form-input"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Search for food items..."
+              />
+              {foodResults.length > 0 && (
+                <div className="food-results">
+                  {foodResults.map(food => (
+                    <div
+                      key={food.id}
+                      className="food-result-item"
+                      onClick={() => selectFood(food)}
+                    >
+                      <div className="food-name">{food.name}</div>
+                      <div className="food-macros">
+                        {food.calories_per_100g} cal, {food.protein_per_100g}g protein, {food.carbs_per_100g}g carbs, {food.fat_per_100g}g fat per 100g
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {selectedFood && (
+            <>
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Quantity</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    placeholder="100"
+                    min="0.1"
+                    step="0.1"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Unit</label>
+                  <select
+                    className="form-select"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                  >
+                    <option value="g">Grams (g)</option>
+                    <option value="kg">Kilograms (kg)</option>
+                    <option value="oz">Ounces (oz)</option>
+                    <option value="lb">Pounds (lb)</option>
+                    <option value="cup">Cups</option>
+                    <option value="tbsp">Tablespoons</option>
+                    <option value="tsp">Teaspoons</option>
+                    <option value="piece">Pieces</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Meal Type</label>
+                <select
+                  className="form-select"
+                  value={mealType}
+                  onChange={(e) => setMealType(e.target.value)}
+                >
+                  <option value="breakfast">Breakfast</option>
+                  <option value="lunch">Lunch</option>
+                  <option value="dinner">Dinner</option>
+                  <option value="snack">Snack</option>
+                </select>
+              </div>
+
+              <button type="submit" className="btn" disabled={loading}>
+                {loading ? 'Logging...' : 'Log Meal'}
+              </button>
+            </>
+          )}
+        </form>
+      </div>
+
+      {/* Recent Meals */}
+      <div className="card">
+        <h3 className="mb-4">
+          <Utensils size={24} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          Recent Meals
+        </h3>
+
+        {meals.length === 0 ? (
+          <p className="text-muted text-center">No meals logged yet. Start by logging your first meal above!</p>
+        ) : (
+          <div>
+            {meals.map(meal => (
+              <div key={meal.id} className="meal-item">
+                <div className="meal-info">
+                  <h4>{meal.name}</h4>
+                  <div className="meal-details">
+                    <span style={{ marginRight: '16px' }}>
+                      <Clock size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                      {formatDate(meal.date)} at {formatTime(meal.created_at)}
+                    </span>
+                    <span style={{ marginRight: '16px' }}>
+                      {meal.quantity} {meal.unit}
+                    </span>
+                    <span style={{ textTransform: 'capitalize' }}>
+                      {meal.meal_type}
+                    </span>
+                  </div>
+                  <div className="meal-details">
+                    {meal.protein}g protein • {meal.carbs}g carbs • {meal.fat}g fat
+                  </div>
+                </div>
+                <div className="flex flex-center gap-2">
+                  <div className="meal-calories">{meal.calories} cal</div>
+                  <button
+                    onClick={() => deleteMeal(meal.id)}
+                    className="btn btn-danger"
+                    style={{ padding: '8px', minWidth: 'auto' }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default MealLogging;
