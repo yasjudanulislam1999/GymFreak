@@ -8,7 +8,7 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && npm start",
     "client": "cd client && npm start",
-    "build": "cd client && npm run build",
+    "build": "cd client && npm install && npm run build",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install",
     "stop": "pkill -f 'node.*index.js' && pkill -f 'react-scripts'"
   },
@@ -32,7 +32,11 @@
     "openai": "^6.2.0",
     "pg": "^8.16.3",
     "sqlite3": "^5.1.6",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "react-scripts": "5.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^4.9.5"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
