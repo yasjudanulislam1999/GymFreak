@@ -4,14 +4,21 @@
   "description": "A platform-independent gym app for tracking TDEE and meal logging",
   "main": "server/index.js",
   "scripts": {
+    "start": "concurrently \"npm run server\" \"npm run client\"",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "cd server && npm run dev",
+    "server": "cd server && npm start",
     "client": "cd client && npm start",
     "build": "cd client && npm run build",
-    "start": "cd server && npm start",
-    "install-all": "npm install && cd server && npm install && cd ../client && npm install"
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install",
+    "stop": "pkill -f 'node.*index.js' && pkill -f 'react-scripts'"
   },
-  "keywords": ["gym", "fitness", "nutrition", "tdee", "meal-logging"],
+  "keywords": [
+    "gym",
+    "fitness",
+    "nutrition",
+    "tdee",
+    "meal-logging"
+  ],
   "author": "Your Name",
   "license": "MIT",
   "devDependencies": {
