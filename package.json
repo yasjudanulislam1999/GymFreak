@@ -8,9 +8,10 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && npm start",
     "client": "cd client && npm start",
-    "build": "cd client && npm run build",
+    "build": "npm run install-all && cd client && npm run build",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install",
-    "stop": "pkill -f 'node.*index.js' && pkill -f 'react-scripts'"
+    "stop": "pkill -f 'node.*index.js' && pkill -f 'react-scripts'",
+    "postinstall": "npm run install-all"
   },
   "keywords": [
     "gym",
