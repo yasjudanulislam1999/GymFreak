@@ -128,7 +128,7 @@ const MealLogging: React.FC = () => {
       setAiResult(recognizedFood);
       setShowAiSection(true);
       setMessage(`AI recognized: ${recognizedFood.name} (${recognizedFood.confidence}% confidence)`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error recognizing image:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error';
       setMessage(`Failed to recognize food image: ${errorMessage}. Please try again.`);

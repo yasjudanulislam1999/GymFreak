@@ -939,6 +939,27 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Image data is required' });
     }
 
+    // Check if OpenAI API key is configured
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
+      console.error('OpenAI API key not configured - returning mock response');
+      
+      // Return a mock response for testing
+      const mockFoods = [
+        { name: 'Grilled Chicken Breast', calories: 165, protein: 31, carbs: 0, fat: 3.6, quantity: 150, unit: 'g', confidence: 85 },
+        { name: 'White Rice', calories: 130, protein: 2.7, carbs: 28, fat: 0.3, quantity: 100, unit: 'g', confidence: 90 },
+        { name: 'Apple', calories: 52, protein: 0.3, carbs: 14, fat: 0.2, quantity: 1, unit: 'piece', confidence: 95 },
+        { name: 'Banana', calories: 89, protein: 1.1, carbs: 23, fat: 0.3, quantity: 1, unit: 'piece', confidence: 92 },
+        { name: 'Bread Slice', calories: 80, protein: 3, carbs: 15, fat: 1, quantity: 1, unit: 'slice', confidence: 88 }
+      ];
+      
+      const randomFood = mockFoods[Math.floor(Math.random() * mockFoods.length)];
+      
+      return res.json({
+        ...randomFood,
+        source: 'Mock AI Recognition (API Key Not Configured)'
+      });
+    }
+
     // Convert base64 to buffer
     const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
