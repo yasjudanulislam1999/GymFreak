@@ -118,17 +118,20 @@ const MealLogging: React.FC = () => {
   const recognizeImageWithAI = async (imageData: string) => {
     setImageLoading(true);
     try {
+      console.log('Sending image for recognition...');
       const response = await axios.post('/api/ai/recognize-image', {
         imageData
       });
       
+      console.log('Recognition response:', response.data);
       const recognizedFood = response.data;
       setAiResult(recognizedFood);
       setShowAiSection(true);
       setMessage(`AI recognized: ${recognizedFood.name} (${recognizedFood.confidence}% confidence)`);
     } catch (error) {
       console.error('Error recognizing image:', error);
-      setMessage('Failed to recognize food image. Please try again.');
+      const errorMessage = error.response?.data?.error || error.message || 'Unknown error';
+      setMessage(`Failed to recognize food image: ${errorMessage}. Please try again.`);
     } finally {
       setImageLoading(false);
     }

@@ -945,31 +945,42 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
 
     // Use OpenAI Vision API for food recognition
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4o", // Updated to use GPT-4o which includes vision capabilities
       messages: [
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: "Analyze this food image and provide nutritional information. Return a JSON object with: name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, estimated_quantity, unit, confidence (0-1). Be specific about the food item and provide realistic nutritional values."
+              text: "Analyze this food image and provide nutritional information. Return ONLY a JSON object with: name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, estimated_quantity, unit, confidence (0-1). Be specific about the food item and provide realistic nutritional values. Do not include any other text."
             },
             {
               type: "image_url",
               image_url: {
-                url: `data:image/jpeg;base64,${base64Data}`
+                url: `data:image/jpeg;base64,${base64Data}`,
+                detail: "low" // Use low detail for faster processing
               }
             }
           ]
         }
       ],
-      max_tokens: 500
+      max_tokens: 300
     });
 
     const aiResponse = response.choices[0].message.content;
+    console.log('AI Response:', aiResponse);
     
     try {
-      const foodData = JSON.parse(aiResponse);
+      // Clean the response to extract JSON
+      let cleanResponse = aiResponse.trim();
+      if (cleanResponse.includes('```json')) {
+        cleanResponse = cleanResponse.split('```json')[1].split('```')[0];
+      } else if (cleanResponse.includes('```')) {
+        cleanResponse = cleanResponse.split('```')[1].split('```')[0];
+      }
+      
+      const foodData = JSON.parse(cleanResponse);
+      console.log('Parsed food data:', foodData);
       
       // Validate and clean the response
       const recognizedFood = {
@@ -987,9 +998,19 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
       res.json(recognizedFood);
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError);
+      console.error('Raw AI response:', aiResponse);
+      
+      // Try to extract food name from the response even if JSON parsing fails
+      let foodName = 'Food Item';
+      if (aiResponse.toLowerCase().includes('chicken')) foodName = 'Chicken';
+      else if (aiResponse.toLowerCase().includes('rice')) foodName = 'Rice';
+      else if (aiResponse.toLowerCase().includes('apple')) foodName = 'Apple';
+      else if (aiResponse.toLowerCase().includes('banana')) foodName = 'Banana';
+      else if (aiResponse.toLowerCase().includes('bread')) foodName = 'Bread';
+      
       // Fallback response
       res.json({
-        name: 'Food Item',
+        name: foodName,
         calories: 150,
         protein: 10,
         carbs: 20,
