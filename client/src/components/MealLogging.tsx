@@ -42,7 +42,7 @@ const MealLogging: React.FC = () => {
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
-  const [showAiSection, setShowAiSection] = useState(false);
+  const [showAiSection, setShowAiSection] = useState(true);
   
   // Camera states
   const [showCamera, setShowCamera] = useState(false);
@@ -250,6 +250,32 @@ const MealLogging: React.FC = () => {
           <Plus size={24} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
           Log New Meal
         </h3>
+
+        {/* Quick Camera Button */}
+        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setShowCamera(true)}
+            className="btn"
+            style={{ 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+              color: 'white', 
+              border: 'none',
+              padding: '12px 24px',
+              fontSize: '16px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              margin: '0 auto'
+            }}
+          >
+            <Camera size={20} style={{ marginRight: '8px' }} />
+            📸 Take Photo of Food
+          </button>
+          <p style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
+            Point your camera at food for instant AI recognition
+          </p>
+        </div>
 
         {message && (
           <div className={message.includes('Error') ? 'error-message' : 'success-message'}>
