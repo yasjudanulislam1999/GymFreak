@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Plus, Trash2, Clock, Utensils, Sparkles, Loader } from 'lucide-react';
+import { Search, Plus, Trash2, Clock, Utensils, Sparkles, Loader, Camera } from 'lucide-react';
+import CameraCapture from './CameraCapture';
 
 interface Food {
   id: string;
@@ -42,6 +43,10 @@ const MealLogging: React.FC = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
   const [showAiSection, setShowAiSection] = useState(false);
+  
+  // Camera states
+  const [showCamera, setShowCamera] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
 
   useEffect(() => {
     fetchMeals();
@@ -107,6 +112,25 @@ const MealLogging: React.FC = () => {
       setShowAiSection(false);
       setAiInput('');
       setAiResult(null);
+    }
+  };
+
+  const recognizeImageWithAI = async (imageData: string) => {
+    setImageLoading(true);
+    try {
+      const response = await axios.post('/api/ai/recognize-image', {
+        imageData
+      });
+      
+      const recognizedFood = response.data;
+      setAiResult(recognizedFood);
+      setShowAiSection(true);
+      setMessage(`AI recognized: ${recognizedFood.name} (${recognizedFood.confidence}% confidence)`);
+    } catch (error) {
+      console.error('Error recognizing image:', error);
+      setMessage('Failed to recognize food image. Please try again.');
+    } finally {
+      setImageLoading(false);
     }
   };
 
@@ -253,8 +277,20 @@ const MealLogging: React.FC = () => {
           {showAiSection && (
             <div>
               <p style={{ marginBottom: '16px', opacity: 0.9 }}>
-                Describe your food in natural language and let AI extract the nutritional information!
+                Describe your food in natural language or take a photo to let AI extract the nutritional information!
               </p>
+              
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCamera(true)}
+                  className="btn"
+                  style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center' }}
+                >
+                  <Camera size={18} style={{ marginRight: '8px' }} />
+                  Take Photo
+                </button>
+              </div>
               
               <div className="flex gap-2">
                 <input
@@ -443,6 +479,14 @@ const MealLogging: React.FC = () => {
           </div>
         )}
       </div>
+      
+      {/* Camera Capture Modal */}
+      {showCamera && (
+        <CameraCapture
+          onImageCapture={recognizeImageWithAI}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
     </div>
   );
 };

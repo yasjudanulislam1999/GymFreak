@@ -930,6 +930,83 @@ app.get('/api/ai/nutrition-summary', authenticateToken, async (req, res) => {
   }
 });
 
+// AI Image Recognition endpoint
+app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
+  try {
+    const { imageData } = req.body;
+
+    if (!imageData) {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
+
+    // Convert base64 to buffer
+    const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Use OpenAI Vision API for food recognition
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-vision-preview",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Analyze this food image and provide nutritional information. Return a JSON object with: name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, estimated_quantity, unit, confidence (0-1). Be specific about the food item and provide realistic nutritional values."
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${base64Data}`
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 500
+    });
+
+    const aiResponse = response.choices[0].message.content;
+    
+    try {
+      const foodData = JSON.parse(aiResponse);
+      
+      // Validate and clean the response
+      const recognizedFood = {
+        name: foodData.name || 'Unknown Food',
+        calories: Math.round(foodData.calories_per_100g || 0),
+        protein: Math.round((foodData.protein_per_100g || 0) * 10) / 10,
+        carbs: Math.round((foodData.carbs_per_100g || 0) * 10) / 10,
+        fat: Math.round((foodData.fat_per_100g || 0) * 10) / 10,
+        quantity: foodData.estimated_quantity || 100,
+        unit: foodData.unit || 'g',
+        confidence: Math.round((foodData.confidence || 0.5) * 100),
+        source: 'AI Vision Recognition'
+      };
+
+      res.json(recognizedFood);
+    } catch (parseError) {
+      console.error('Error parsing AI response:', parseError);
+      // Fallback response
+      res.json({
+        name: 'Food Item',
+        calories: 150,
+        protein: 10,
+        carbs: 20,
+        fat: 5,
+        quantity: 100,
+        unit: 'g',
+        confidence: 50,
+        source: 'AI Vision Recognition (Fallback)'
+      });
+    }
+
+  } catch (error) {
+    console.error('AI image recognition error:', error);
+    res.status(500).json({ error: 'Failed to recognize food image' });
+  }
+});
+
 // Serve static files from React build
 app.use(express.static(path.join(__dirname, '../client/build')));
 
