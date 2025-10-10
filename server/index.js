@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const path = require('path');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -927,6 +928,14 @@ app.get('/api/ai/nutrition-summary', authenticateToken, async (req, res) => {
     console.error('Nutrition summary error:', error);
     res.status(500).json({ error: 'Failed to fetch nutrition summary' });
   }
+});
+
+// Serve static files from React build
+app.use(express.static(path.join(__dirname, '../client/build')));
+
+// Handle React routing, return all requests to React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
 app.listen(PORT, () => {
