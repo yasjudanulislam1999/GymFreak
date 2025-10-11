@@ -116,6 +116,10 @@ const MealLogging: React.FC = () => {
     }
   };
 
+  const handleFoodItemClick = (foodIndex: number) => {
+    useAIResult(foodIndex);
+  };
+
   const recognizeImageWithAI = async (imageData: string) => {
     setImageLoading(true);
     try {
@@ -132,7 +136,7 @@ const MealLogging: React.FC = () => {
       if (recognizedFoods.length === 1) {
         setMessage(`AI recognized: ${recognizedFoods[0].name} (${recognizedFoods[0].confidence}% confidence)`);
       } else {
-        const foodNames = recognizedFoods.map(food => food.name).join(', ');
+        const foodNames = recognizedFoods.map((food: any) => food.name).join(', ');
         setMessage(`AI recognized ${recognizedFoods.length} items: ${foodNames}`);
       }
     } catch (error: any) {
@@ -372,9 +376,9 @@ const MealLogging: React.FC = () => {
                       cursor: 'pointer',
                       transition: 'background 0.2s'
                     }}
-                    onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
-                    onMouseLeave={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
-                    onClick={() => useAIResult(index)}>
+                    onMouseEnter={(e) => (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.1)'}
+                    onMouseLeave={(e) => (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)'}
+                    onClick={() => handleFoodItemClick(index)}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <h5 style={{ margin: 0, color: '#fff' }}>{food.name}</h5>
                         <span style={{ fontSize: '12px', opacity: 0.8 }}>{food.confidence}% confidence</span>
