@@ -93,7 +93,7 @@ const MealLogging: React.FC = () => {
     }
   };
 
-  const useAIResult = (foodIndex = 0) => {
+  const selectAIResult = (foodIndex = 0) => {
     if (aiResult && Array.isArray(aiResult) && aiResult[foodIndex]) {
       const selectedFoodItem = aiResult[foodIndex];
       setSelectedFood({
@@ -117,7 +117,7 @@ const MealLogging: React.FC = () => {
   };
 
   const handleFoodItemClick = (foodIndex: number) => {
-    useAIResult(foodIndex);
+    selectAIResult(foodIndex);
   };
 
   const recognizeImageWithAI = async (imageData: string) => {
