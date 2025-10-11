@@ -956,8 +956,10 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
       const randomFood = mockFoods[Math.floor(Math.random() * mockFoods.length)];
       
       return res.json({
-        ...randomFood,
-        source: 'Mock AI Recognition (API Key Not Configured)'
+        foods: [{
+          ...randomFood,
+          source: 'Mock AI Recognition (API Key Not Configured)'
+        }]
       });
     }
 
@@ -974,7 +976,7 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
           content: [
             {
               type: "text",
-              text: "Analyze this food image and provide nutritional information. Return ONLY a JSON object with: name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, estimated_quantity, unit, confidence (0-1). Be specific about the food item and provide realistic nutritional values. Do not include any other text."
+              text: "Analyze this food image and identify ALL food items visible. For each food item, provide nutritional information. Return ONLY a JSON object with this structure: {\"foods\": [{\"name\": \"item1\", \"calories_per_100g\": 100, \"protein_per_100g\": 10, \"carbs_per_100g\": 15, \"fat_per_100g\": 5, \"estimated_quantity\": 150, \"unit\": \"g\", \"confidence\": 0.9}, {\"name\": \"item2\", ...}]}. If it's a single item, still use the foods array with one object. Be specific about each food item and provide realistic nutritional values. Do not include any other text."
             },
             {
               type: "image_url",
@@ -1004,20 +1006,37 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
       const foodData = JSON.parse(cleanResponse);
       console.log('Parsed food data:', foodData);
       
-      // Validate and clean the response
-      const recognizedFood = {
-        name: foodData.name || 'Unknown Food',
-        calories: Math.round(foodData.calories_per_100g || 0),
-        protein: Math.round((foodData.protein_per_100g || 0) * 10) / 10,
-        carbs: Math.round((foodData.carbs_per_100g || 0) * 10) / 10,
-        fat: Math.round((foodData.fat_per_100g || 0) * 10) / 10,
-        quantity: foodData.estimated_quantity || 100,
-        unit: foodData.unit || 'g',
-        confidence: Math.round((foodData.confidence || 0.5) * 100),
-        source: 'AI Vision Recognition'
-      };
+      // Handle both single food and multiple foods format
+      let foods = [];
+      if (foodData.foods && Array.isArray(foodData.foods)) {
+        // Multiple foods format
+        foods = foodData.foods.map(food => ({
+          name: food.name || 'Unknown Food',
+          calories: Math.round(food.calories_per_100g || 0),
+          protein: Math.round((food.protein_per_100g || 0) * 10) / 10,
+          carbs: Math.round((food.carbs_per_100g || 0) * 10) / 10,
+          fat: Math.round((food.fat_per_100g || 0) * 10) / 10,
+          quantity: food.estimated_quantity || 100,
+          unit: food.unit || 'g',
+          confidence: Math.round((food.confidence || 0.5) * 100),
+          source: 'AI Vision Recognition'
+        }));
+      } else {
+        // Single food format (fallback)
+        foods = [{
+          name: foodData.name || 'Unknown Food',
+          calories: Math.round(foodData.calories_per_100g || 0),
+          protein: Math.round((foodData.protein_per_100g || 0) * 10) / 10,
+          carbs: Math.round((foodData.carbs_per_100g || 0) * 10) / 10,
+          fat: Math.round((foodData.fat_per_100g || 0) * 10) / 10,
+          quantity: foodData.estimated_quantity || 100,
+          unit: foodData.unit || 'g',
+          confidence: Math.round((foodData.confidence || 0.5) * 100),
+          source: 'AI Vision Recognition'
+        }];
+      }
 
-      res.json(recognizedFood);
+      res.json({ foods });
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError);
       console.error('Raw AI response:', aiResponse);
@@ -1032,15 +1051,17 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
       
       // Fallback response
       res.json({
-        name: foodName,
-        calories: 150,
-        protein: 10,
-        carbs: 20,
-        fat: 5,
-        quantity: 100,
-        unit: 'g',
-        confidence: 50,
-        source: 'AI Vision Recognition (Fallback)'
+        foods: [{
+          name: foodName,
+          calories: 150,
+          protein: 10,
+          carbs: 20,
+          fat: 5,
+          quantity: 100,
+          unit: 'g',
+          confidence: 50,
+          source: 'AI Vision Recognition (Fallback)'
+        }]
       });
     }
 

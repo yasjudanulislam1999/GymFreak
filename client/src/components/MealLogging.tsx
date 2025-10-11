@@ -93,21 +93,22 @@ const MealLogging: React.FC = () => {
     }
   };
 
-  const useAIResult = () => {
-    if (aiResult) {
+  const useAIResult = (foodIndex = 0) => {
+    if (aiResult && Array.isArray(aiResult) && aiResult[foodIndex]) {
+      const selectedFoodItem = aiResult[foodIndex];
       setSelectedFood({
-        id: 'ai-' + Date.now(),
-        name: aiResult.name,
-        calories_per_100g: aiResult.calories,
-        protein_per_100g: aiResult.protein,
-        carbs_per_100g: aiResult.carbs,
-        fat_per_100g: aiResult.fat,
+        id: 'ai-' + Date.now() + '-' + foodIndex,
+        name: selectedFoodItem.name,
+        calories_per_100g: selectedFoodItem.calories,
+        protein_per_100g: selectedFoodItem.protein,
+        carbs_per_100g: selectedFoodItem.carbs,
+        fat_per_100g: selectedFoodItem.fat,
         category: 'AI Recognized'
       });
       
       // Use AI-detected quantity and unit
-      setQuantity(aiResult.quantity ? aiResult.quantity.toString() : '100');
-      setUnit(aiResult.unit || 'g');
+      setQuantity(selectedFoodItem.quantity ? selectedFoodItem.quantity.toString() : '100');
+      setUnit(selectedFoodItem.unit || 'g');
       
       setShowAiSection(false);
       setAiInput('');
@@ -124,10 +125,16 @@ const MealLogging: React.FC = () => {
       });
       
       console.log('Recognition response:', response.data);
-      const recognizedFood = response.data;
-      setAiResult(recognizedFood);
+      const recognizedFoods = response.data.foods || [response.data]; // Handle both formats
+      setAiResult(recognizedFoods);
       setShowAiSection(true);
-      setMessage(`AI recognized: ${recognizedFood.name} (${recognizedFood.confidence}% confidence)`);
+      
+      if (recognizedFoods.length === 1) {
+        setMessage(`AI recognized: ${recognizedFoods[0].name} (${recognizedFoods[0].confidence}% confidence)`);
+      } else {
+        const foodNames = recognizedFoods.map(food => food.name).join(', ');
+        setMessage(`AI recognized ${recognizedFoods.length} items: ${foodNames}`);
+      }
     } catch (error: any) {
       console.error('Error recognizing image:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error';
@@ -342,7 +349,7 @@ const MealLogging: React.FC = () => {
                 </button>
               </div>
 
-              {aiResult && (
+              {aiResult && Array.isArray(aiResult) && (
                 <div style={{ 
                   marginTop: '16px', 
                   padding: '16px', 
@@ -351,23 +358,46 @@ const MealLogging: React.FC = () => {
                   border: '1px solid rgba(255,255,255,0.2)'
                 }}>
                   <h4 style={{ margin: '0 0 12px 0' }}>AI Recognition Result</h4>
-                  <div className="grid grid-2" style={{ marginBottom: '12px' }}>
-                    <div><strong>Food:</strong> {aiResult.name}</div>
-                    <div><strong>Quantity:</strong> {aiResult.quantity} {aiResult.unit}</div>
-                    <div><strong>Calories:</strong> {aiResult.calories} cal</div>
-                    <div><strong>Protein:</strong> {aiResult.protein}g</div>
-                    <div><strong>Carbs:</strong> {aiResult.carbs}g</div>
-                    <div><strong>Fat:</strong> {aiResult.fat}g</div>
-                    <div><strong>Confidence:</strong> {aiResult.confidence}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={useAIResult}
-                    className="btn"
-                    style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)' }}
-                  >
-                    Use This Food
-                  </button>
+                  <p style={{ margin: '0 0 16px 0', fontSize: '14px', opacity: 0.9 }}>
+                    Found {aiResult.length} food item{aiResult.length > 1 ? 's' : ''}. Click on any item to use it:
+                  </p>
+                  
+                  {aiResult.map((food, index) => (
+                    <div key={index} style={{ 
+                      marginBottom: '12px', 
+                      padding: '12px', 
+                      background: 'rgba(255,255,255,0.05)', 
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
+                    onMouseLeave={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
+                    onClick={() => useAIResult(index)}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <h5 style={{ margin: 0, color: '#fff' }}>{food.name}</h5>
+                        <span style={{ fontSize: '12px', opacity: 0.8 }}>{food.confidence}% confidence</span>
+                      </div>
+                      <div className="grid grid-3" style={{ fontSize: '12px', opacity: 0.9 }}>
+                        <div><strong>Quantity:</strong> {food.quantity} {food.unit}</div>
+                        <div><strong>Calories:</strong> {food.calories} cal</div>
+                        <div><strong>Protein:</strong> {food.protein}g</div>
+                        <div><strong>Carbs:</strong> {food.carbs}g</div>
+                        <div><strong>Fat:</strong> {food.fat}g</div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ 
+                            background: 'rgba(255,255,255,0.2)', 
+                            padding: '4px 8px', 
+                            borderRadius: '4px',
+                            fontSize: '11px'
+                          }}>
+                            Click to use
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
