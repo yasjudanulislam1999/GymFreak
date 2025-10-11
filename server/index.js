@@ -21,7 +21,8 @@ const openai = new OpenAI({
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' })); // Increase limit for image data
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Database setup
 const pool = new Pool({

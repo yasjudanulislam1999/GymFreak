@@ -49,11 +49,24 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
       const context = canvas.getContext('2d');
 
       if (context) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0);
+        // Resize image to reduce payload size
+        const maxWidth = 800;
+        const maxHeight = 600;
+        let { videoWidth, videoHeight } = video;
         
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        // Calculate new dimensions maintaining aspect ratio
+        if (videoWidth > maxWidth || videoHeight > maxHeight) {
+          const ratio = Math.min(maxWidth / videoWidth, maxHeight / videoHeight);
+          videoWidth = videoWidth * ratio;
+          videoHeight = videoHeight * ratio;
+        }
+        
+        canvas.width = videoWidth;
+        canvas.height = videoHeight;
+        context.drawImage(video, 0, 0, videoWidth, videoHeight);
+        
+        // Use lower quality to reduce file size
+        const imageData = canvas.toDataURL('image/jpeg', 0.6);
         setCapturedImage(imageData);
         stopCamera();
       }
