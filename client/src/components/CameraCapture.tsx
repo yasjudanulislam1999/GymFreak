@@ -25,11 +25,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
         throw new Error('Camera not supported on this device');
       }
 
-      // Get camera stream
+      // Get camera stream - try back camera first
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           width: { ideal: 640 },
-          height: { ideal: 480 }
+          height: { ideal: 480 },
+          facingMode: 'environment' // Try back camera first
         } 
       });
       
@@ -45,25 +46,36 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
           console.log('Video play error:', err);
         });
         
-        // Simple timeout - if video doesn't load in 2 seconds, stop loading
-        setTimeout(() => {
-          console.log('⏰ Camera timeout - stopping loading');
+        // Longer timeout - if video doesn't load in 5 seconds, show error
+        const timeoutId = setTimeout(() => {
+          console.log('⏰ Camera timeout - video not loading');
           setIsLoading(false);
-        }, 2000);
+          setError('Camera is taking too long to load. Please try again or use text input.');
+        }, 5000);
         
         // Stop loading when video can play
         const handleCanPlay = () => {
           console.log('✅ Video ready');
+          clearTimeout(timeoutId);
           setIsLoading(false);
         };
         
         const handleLoadedData = () => {
           console.log('✅ Video data loaded');
+          clearTimeout(timeoutId);
           setIsLoading(false);
+        };
+        
+        const handleError = () => {
+          console.log('❌ Video error');
+          clearTimeout(timeoutId);
+          setIsLoading(false);
+          setError('Camera failed to load. Please use text input instead.');
         };
         
         video.addEventListener('canplay', handleCanPlay, { once: true });
         video.addEventListener('loadeddata', handleLoadedData, { once: true });
+        video.addEventListener('error', handleError, { once: true });
       } else {
         setIsLoading(false);
       }
