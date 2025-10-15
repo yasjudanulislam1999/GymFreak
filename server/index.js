@@ -309,8 +309,161 @@ async function recognizeFoodWithAI(foodDescription) {
   }
 }
 
-// Mock food recognition for demo purposes
+// Enhanced mock food recognition for complex meals
 function mockFoodRecognition(foodDescription) {
+  const lowerDescription = foodDescription.toLowerCase();
+  
+  // Enhanced food database with per 100g values
+  const foodDatabase = {
+    'chicken breast': { calories: 165, protein: 31, carbs: 0, fat: 3.6 },
+    'chicken': { calories: 165, protein: 31, carbs: 0, fat: 3.6 },
+    'rice': { calories: 130, protein: 2.7, carbs: 28, fat: 0.3 },
+    'white rice': { calories: 130, protein: 2.7, carbs: 28, fat: 0.3 },
+    'brown rice': { calories: 111, protein: 2.6, carbs: 23, fat: 0.9 },
+    'beef': { calories: 250, protein: 26, carbs: 0, fat: 15 },
+    'salmon': { calories: 208, protein: 25, carbs: 0, fat: 12 },
+    'egg': { calories: 155, protein: 13, carbs: 1.1, fat: 11 },
+    'eggs': { calories: 155, protein: 13, carbs: 1.1, fat: 11 },
+    'bread': { calories: 265, protein: 9, carbs: 49, fat: 3.2 },
+    'potato': { calories: 77, protein: 2, carbs: 17, fat: 0.1 },
+    'broccoli': { calories: 34, protein: 2.8, carbs: 7, fat: 0.4 },
+    'carrot': { calories: 41, protein: 0.9, carbs: 10, fat: 0.2 },
+    'apple': { calories: 52, protein: 0.3, carbs: 14, fat: 0.2 },
+    'banana': { calories: 89, protein: 1.1, carbs: 23, fat: 0.3 },
+    'milk': { calories: 42, protein: 3.4, carbs: 5, fat: 1 },
+    'cheese': { calories: 113, protein: 7, carbs: 1, fat: 9 },
+    'pasta': { calories: 131, protein: 5, carbs: 25, fat: 1.1 },
+    'quinoa': { calories: 120, protein: 4.4, carbs: 22, fat: 1.9 },
+    'oats': { calories: 389, protein: 17, carbs: 66, fat: 7 },
+    'almonds': { calories: 579, protein: 21, carbs: 22, fat: 50 },
+    'peanut butter': { calories: 588, protein: 25, carbs: 20, fat: 50 },
+    'avocado': { calories: 160, protein: 2, carbs: 9, fat: 15 },
+    'olive oil': { calories: 884, protein: 0, carbs: 0, fat: 100 }
+  };
+  
+  // Parse complex meal descriptions
+  const mealComponents = parseMealDescription(foodDescription);
+  
+  if (mealComponents.length === 0) {
+    // Fallback to simple recognition
+    return simpleFoodRecognition(foodDescription, foodDatabase);
+  }
+  
+  // Calculate total nutrition for the entire meal
+  let totalCalories = 0;
+  let totalProtein = 0;
+  let totalCarbs = 0;
+  let totalFat = 0;
+  let totalWeight = 0;
+  
+  mealComponents.forEach(component => {
+    const food = foodDatabase[component.name];
+    if (food) {
+      // Convert to 100g base
+      const multiplier = component.quantity / 100;
+      totalCalories += food.calories * multiplier;
+      totalProtein += food.protein * multiplier;
+      totalCarbs += food.carbs * multiplier;
+      totalFat += food.fat * multiplier;
+      totalWeight += component.quantity;
+    }
+  });
+  
+  return {
+    name: foodDescription,
+    calories: Math.round(totalCalories),
+    protein: Math.round(totalProtein * 10) / 10,
+    carbs: Math.round(totalCarbs * 10) / 10,
+    fat: Math.round(totalFat * 10) / 10,
+    quantity: Math.round(totalWeight),
+    unit: 'g',
+    confidence: 'high',
+    source: 'mock-multi-component'
+  };
+}
+
+// Parse meal description to extract individual components
+function parseMealDescription(description) {
+  const components = [];
+  const lowerDesc = description.toLowerCase();
+  
+  // Common patterns for parsing meal descriptions
+  const patterns = [
+    // Pattern: "1 chicken breast with 100g rice"
+    /(\d+(?:\.\d+)?)\s*(?:chicken breast|chicken)\s*(?:with|and)\s*(\d+(?:\.\d+)?)\s*(?:g|gram|grams)?\s*(?:of\s*)?(rice|white rice|brown rice)/,
+    // Pattern: "100g rice with 1 chicken breast"
+    /(\d+(?:\.\d+)?)\s*(?:g|gram|grams)?\s*(?:of\s*)?(rice|white rice|brown rice)\s*(?:with|and)\s*(\d+(?:\.\d+)?)\s*(?:chicken breast|chicken)/,
+    // Pattern: "2 eggs with 50g bread"
+    /(\d+(?:\.\d+)?)\s*(?:eggs?)\s*(?:with|and)\s*(\d+(?:\.\d+)?)\s*(?:g|gram|grams)?\s*(?:of\s*)?(bread)/,
+    // Pattern: "1 chicken breast and 100g rice"
+    /(\d+(?:\.\d+)?)\s*(?:chicken breast|chicken)\s*(?:and)\s*(\d+(?:\.\d+)?)\s*(?:g|gram|grams)?\s*(?:of\s*)?(rice|white rice|brown rice)/,
+    // Pattern: "100g rice and 1 chicken breast"
+    /(\d+(?:\.\d+)?)\s*(?:g|gram|grams)?\s*(?:of\s*)?(rice|white rice|brown rice)\s*(?:and)\s*(\d+(?:\.\d+)?)\s*(?:chicken breast|chicken)/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = lowerDesc.match(pattern);
+    if (match) {
+      if (pattern.source.includes('chicken breast|chicken.*with.*rice')) {
+        // "1 chicken breast with 100g rice"
+        components.push({
+          name: 'chicken breast',
+          quantity: parseFloat(match[1]) * 150 // Assume 150g per chicken breast
+        });
+        components.push({
+          name: match[3] || 'rice',
+          quantity: parseFloat(match[2])
+        });
+      } else if (pattern.source.includes('rice.*with.*chicken')) {
+        // "100g rice with 1 chicken breast"
+        components.push({
+          name: match[2] || 'rice',
+          quantity: parseFloat(match[1])
+        });
+        components.push({
+          name: 'chicken breast',
+          quantity: parseFloat(match[3]) * 150 // Assume 150g per chicken breast
+        });
+      } else if (pattern.source.includes('eggs.*with.*bread')) {
+        // "2 eggs with 50g bread"
+        components.push({
+          name: 'egg',
+          quantity: parseFloat(match[1]) * 50 // Assume 50g per egg
+        });
+        components.push({
+          name: match[3] || 'bread',
+          quantity: parseFloat(match[2])
+        });
+      } else if (pattern.source.includes('chicken.*and.*rice')) {
+        // "1 chicken breast and 100g rice"
+        components.push({
+          name: 'chicken breast',
+          quantity: parseFloat(match[1]) * 150
+        });
+        components.push({
+          name: match[3] || 'rice',
+          quantity: parseFloat(match[2])
+        });
+      } else if (pattern.source.includes('rice.*and.*chicken')) {
+        // "100g rice and 1 chicken breast"
+        components.push({
+          name: match[2] || 'rice',
+          quantity: parseFloat(match[1])
+        });
+        components.push({
+          name: 'chicken breast',
+          quantity: parseFloat(match[3]) * 150
+        });
+      }
+      break; // Use first matching pattern
+    }
+  }
+  
+  return components;
+}
+
+// Simple food recognition for single items
+function simpleFoodRecognition(foodDescription, foodDatabase) {
   const lowerDescription = foodDescription.toLowerCase();
   
   // Parse quantity and unit from description
@@ -356,7 +509,7 @@ function mockFoodRecognition(foodDescription) {
   }
   
   // Simple keyword matching for demo
-  const foodDatabase = {
+  const simpleFoodDatabase = {
     'chicken': { calories: 165, protein: 31, carbs: 0, fat: 3.6 },
     'rice': { calories: 111, protein: 2.6, carbs: 23, fat: 0.9 },
     'pasta': { calories: 131, protein: 5, carbs: 25, fat: 1.1 },
@@ -371,7 +524,7 @@ function mockFoodRecognition(foodDescription) {
   };
 
   // Find matching food
-  for (const [key, nutrition] of Object.entries(foodDatabase)) {
+  for (const [key, nutrition] of Object.entries(simpleFoodDatabase)) {
     if (cleanDescription.includes(key)) {
       return {
         name: cleanDescription,
