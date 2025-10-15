@@ -101,17 +101,22 @@ const MealLogging: React.FC = () => {
   const selectAIResult = (foodIndex = 0) => {
     if (aiResult && Array.isArray(aiResult) && aiResult[foodIndex]) {
       const selectedFoodItem = aiResult[foodIndex];
+      
+      // Convert AI scaled values back to per-100g values for consistent frontend calculation
+      const quantity = selectedFoodItem.quantity || 100;
+      const scaleFactor = quantity / 100;
+      
       setSelectedFood({
         id: 'ai-' + Date.now() + '-' + foodIndex,
         name: selectedFoodItem.name,
-        calories_per_100g: selectedFoodItem.calories,
-        protein_per_100g: selectedFoodItem.protein,
-        carbs_per_100g: selectedFoodItem.carbs,
-        fat_per_100g: selectedFoodItem.fat,
+        calories_per_100g: selectedFoodItem.calories / scaleFactor,
+        protein_per_100g: selectedFoodItem.protein / scaleFactor,
+        carbs_per_100g: selectedFoodItem.carbs / scaleFactor,
+        fat_per_100g: selectedFoodItem.fat / scaleFactor,
         category: 'AI Recognized'
       });
       
-      // Use AI-detected quantity and unit
+      // Preserve the AI-detected quantity and unit (don't reset to 100g)
       setQuantity(selectedFoodItem.quantity ? selectedFoodItem.quantity.toString() : '100');
       setUnit(selectedFoodItem.unit || 'g');
       
