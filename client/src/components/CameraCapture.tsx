@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Camera, X, RotateCcw, Check, Zap } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { X, RotateCcw, Check, Zap } from 'lucide-react';
 
 interface CameraCaptureProps {
   onImageCapture: (imageData: string) => void;
@@ -8,14 +8,13 @@ interface CameraCaptureProps {
 
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
     try {
       setError(null);
       setIsLoading(true);
@@ -39,18 +38,17 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
       setError('Unable to access camera. Please check permissions.');
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
-  };
+  }, [stream]);
 
   const captureImage = () => {
     if (videoRef.current && canvasRef.current) {
-      setIsCapturing(true);
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
@@ -76,7 +74,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
         const imageData = canvas.toDataURL('image/jpeg', 0.7);
         setCapturedImage(imageData);
         stopCamera();
-        setIsCapturing(false);
       }
     }
   };
@@ -103,7 +100,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [startCamera, stopCamera]);
 
   return (
     <div style={{
@@ -377,7 +374,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes slideDown {
           from {
             opacity: 0;

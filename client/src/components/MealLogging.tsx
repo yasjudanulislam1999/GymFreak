@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Plus, Trash2, Clock, Utensils, Sparkles, Loader, Camera } from 'lucide-react';
+import { Plus, Trash2, Clock, Utensils, Sparkles, Loader, Camera } from 'lucide-react';
 import CameraCapture from './CameraCapture';
 
 interface Food {
@@ -46,7 +46,6 @@ const MealLogging: React.FC = () => {
   
   // Camera states
   const [showCamera, setShowCamera] = useState(false);
-  const [imageLoading, setImageLoading] = useState(false);
 
   useEffect(() => {
     fetchMeals();
