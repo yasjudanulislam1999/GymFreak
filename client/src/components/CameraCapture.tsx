@@ -16,85 +16,93 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
 
   const startCamera = useCallback(async () => {
     try {
+      console.log('🎥 Starting camera initialization...');
       setError(null);
       setIsLoading(true);
       
       // Check if getUserMedia is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('❌ Camera not supported on this device');
         throw new Error('Camera not supported on this device');
       }
 
-      // Try to get camera with different constraints
+      console.log('📱 Requesting camera access...');
+      
+      // Try basic camera access first
       let mediaStream;
       try {
-        // First try with back camera
+        console.log('🔄 Trying basic camera access...');
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        console.log('✅ Basic camera access successful');
+      } catch (basicError) {
+        console.log('❌ Basic camera failed, trying with constraints:', basicError);
+        // Try with specific constraints
         mediaStream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: 'environment',
             width: { ideal: 640 },
             height: { ideal: 480 }
           }
         });
-      } catch (backCameraError) {
-        console.log('Back camera failed, trying front camera:', backCameraError);
-        // Fallback to front camera
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user',
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          }
-        });
+        console.log('✅ Constrained camera access successful');
       }
       
+      console.log('📹 Setting up video stream...');
       setStream(mediaStream);
       
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        
-        // Add multiple event listeners to ensure loading completes
         const video = videoRef.current;
+        video.srcObject = mediaStream;
         
-        const handleLoadedData = () => {
-          console.log('Video loaded successfully');
+        console.log('🎬 Video element configured, waiting for load...');
+        
+        // Simple approach - just wait for the video to be ready
+        const checkVideoReady = () => {
+          if (video.readyState >= 2) { // HAVE_CURRENT_DATA
+            console.log('✅ Video is ready to play');
+            setIsLoading(false);
+            return true;
+          }
+          return false;
+        };
+        
+        // Check immediately
+        if (checkVideoReady()) {
+          return;
+        }
+        
+        // Set up event listeners
+        const handleVideoReady = () => {
+          console.log('✅ Video loaded via event listener');
           setIsLoading(false);
         };
         
-        const handleCanPlay = () => {
-          console.log('Video can play');
-          setIsLoading(false);
-        };
+        video.addEventListener('loadeddata', handleVideoReady);
+        video.addEventListener('canplay', handleVideoReady);
+        video.addEventListener('loadedmetadata', handleVideoReady);
         
-        const handleLoadedMetadata = () => {
-          console.log('Video metadata loaded');
-          setIsLoading(false);
-        };
-        
-        // Add event listeners
-        video.addEventListener('loadeddata', handleLoadedData);
-        video.addEventListener('canplay', handleCanPlay);
-        video.addEventListener('loadedmetadata', handleLoadedMetadata);
-        
-        // Set a timeout to stop loading if video doesn't load
+        // Timeout after 3 seconds
         const timeout = setTimeout(() => {
-          console.log('Video loading timeout, stopping loading state');
+          console.log('⏰ Video loading timeout, forcing stop loading');
           setIsLoading(false);
-        }, 5000);
+        }, 3000);
         
-        // Clean up timeout when video loads
+        // Clean up when video loads
         const cleanup = () => {
           clearTimeout(timeout);
-          video.removeEventListener('loadeddata', handleLoadedData);
-          video.removeEventListener('canplay', handleCanPlay);
-          video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+          video.removeEventListener('loadeddata', handleVideoReady);
+          video.removeEventListener('canplay', handleVideoReady);
+          video.removeEventListener('loadedmetadata', handleVideoReady);
         };
         
         video.addEventListener('loadeddata', cleanup, { once: true });
         video.addEventListener('canplay', cleanup, { once: true });
         video.addEventListener('loadedmetadata', cleanup, { once: true });
+      } else {
+        console.error('❌ Video ref not available');
+        setIsLoading(false);
       }
     } catch (err: any) {
-      console.error('Error accessing camera:', err);
+      console.error('❌ Camera error:', err);
       let errorMessage = 'Unable to access camera. ';
       
       if (err.name === 'NotAllowedError') {
@@ -104,7 +112,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
       } else if (err.name === 'NotSupportedError') {
         errorMessage += 'Camera not supported on this device.';
       } else {
-        errorMessage += 'Please check your camera settings and try again.';
+        errorMessage += `Error: ${err.message}`;
       }
       
       setError(errorMessage);
@@ -377,27 +385,53 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                       marginBottom: '12px'
                     }}></div>
                     <p style={{ margin: '0 0 12px 0', fontSize: '14px' }}>Starting camera...</p>
-                    <button
-                      onClick={startCamera}
-                      style={{
-                        backgroundColor: '#3b82f6',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        fontWeight: '500'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2563eb';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#3b82f6';
-                      }}
-                    >
-                      🔄 Retry Camera
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', flexDirection: 'column', alignItems: 'center' }}>
+                      <button
+                        onClick={startCamera}
+                        style={{
+                          backgroundColor: '#3b82f6',
+                          color: 'white',
+                          border: 'none',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          fontWeight: '500'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#2563eb';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#3b82f6';
+                        }}
+                      >
+                        🔄 Retry Camera
+                      </button>
+                      <button
+                        onClick={() => {
+                          console.log('🛑 Manually stopping loading state');
+                          setIsLoading(false);
+                        }}
+                        style={{
+                          backgroundColor: '#6b7280',
+                          color: 'white',
+                          border: 'none',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          cursor: 'pointer',
+                          fontWeight: '500'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#4b5563';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#6b7280';
+                        }}
+                      >
+                        ⏹️ Stop Loading
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <video
