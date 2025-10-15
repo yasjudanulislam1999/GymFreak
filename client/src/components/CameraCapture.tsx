@@ -18,24 +18,96 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
     try {
       setError(null);
       setIsLoading(true);
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment', // Use back camera on mobile
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
-      });
+      
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera not supported on this device');
+      }
+
+      // Try to get camera with different constraints
+      let mediaStream;
+      try {
+        // First try with back camera
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
+        });
+      } catch (backCameraError) {
+        console.log('Back camera failed, trying front camera:', backCameraError);
+        // Fallback to front camera
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
+        });
+      }
       
       setStream(mediaStream);
+      
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
-        videoRef.current.onloadedmetadata = () => {
+        
+        // Add multiple event listeners to ensure loading completes
+        const video = videoRef.current;
+        
+        const handleLoadedData = () => {
+          console.log('Video loaded successfully');
           setIsLoading(false);
         };
+        
+        const handleCanPlay = () => {
+          console.log('Video can play');
+          setIsLoading(false);
+        };
+        
+        const handleLoadedMetadata = () => {
+          console.log('Video metadata loaded');
+          setIsLoading(false);
+        };
+        
+        // Add event listeners
+        video.addEventListener('loadeddata', handleLoadedData);
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        
+        // Set a timeout to stop loading if video doesn't load
+        const timeout = setTimeout(() => {
+          console.log('Video loading timeout, stopping loading state');
+          setIsLoading(false);
+        }, 5000);
+        
+        // Clean up timeout when video loads
+        const cleanup = () => {
+          clearTimeout(timeout);
+          video.removeEventListener('loadeddata', handleLoadedData);
+          video.removeEventListener('canplay', handleCanPlay);
+          video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        };
+        
+        video.addEventListener('loadeddata', cleanup, { once: true });
+        video.addEventListener('canplay', cleanup, { once: true });
+        video.addEventListener('loadedmetadata', cleanup, { once: true });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error accessing camera:', err);
-      setError('Unable to access camera. Please check permissions.');
+      let errorMessage = 'Unable to access camera. ';
+      
+      if (err.name === 'NotAllowedError') {
+        errorMessage += 'Please allow camera permissions and try again.';
+      } else if (err.name === 'NotFoundError') {
+        errorMessage += 'No camera found on this device.';
+      } else if (err.name === 'NotSupportedError') {
+        errorMessage += 'Camera not supported on this device.';
+      } else {
+        errorMessage += 'Please check your camera settings and try again.';
+      }
+      
+      setError(errorMessage);
       setIsLoading(false);
     }
   }, []);
@@ -173,7 +245,28 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
             marginBottom: '16px',
             fontSize: '14px'
           }}>
-            {error}
+            <div style={{ marginBottom: '8px' }}>{error}</div>
+            <button
+              onClick={startCamera}
+              style={{
+                backgroundColor: '#dc2626',
+                color: 'white',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#b91c1c';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#dc2626';
+              }}
+            >
+              🔄 Try Again
+            </button>
           </div>
         )}
 
@@ -283,7 +376,28 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                       animation: 'spin 1s linear infinite',
                       marginBottom: '12px'
                     }}></div>
-                    <p style={{ margin: 0, fontSize: '14px' }}>Starting camera...</p>
+                    <p style={{ margin: '0 0 12px 0', fontSize: '14px' }}>Starting camera...</p>
+                    <button
+                      onClick={startCamera}
+                      style={{
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#2563eb';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#3b82f6';
+                      }}
+                    >
+                      🔄 Retry Camera
+                    </button>
                   </div>
                 ) : (
                   <video
