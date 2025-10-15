@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Camera, X, RotateCcw, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, X, RotateCcw, Check, Zap } from 'lucide-react';
 
 interface CameraCaptureProps {
   onImageCapture: (imageData: string) => void;
@@ -11,27 +11,33 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
   const [isCapturing, setIsCapturing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const startCamera = async () => {
     try {
       setError(null);
+      setIsLoading(true);
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment', // Use back camera on mobile
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 640 },
+          height: { ideal: 480 }
         }
       });
       
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.onloadedmetadata = () => {
+          setIsLoading(false);
+        };
       }
     } catch (err) {
       console.error('Error accessing camera:', err);
       setError('Unable to access camera. Please check permissions.');
+      setIsLoading(false);
     }
   };
 
@@ -44,14 +50,15 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
 
   const captureImage = () => {
     if (videoRef.current && canvasRef.current) {
+      setIsCapturing(true);
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
 
       if (context) {
         // Resize image to reduce payload size
-        const maxWidth = 800;
-        const maxHeight = 600;
+        const maxWidth = 600;
+        const maxHeight = 450;
         let { videoWidth, videoHeight } = video;
         
         // Calculate new dimensions maintaining aspect ratio
@@ -66,9 +73,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
         context.drawImage(video, 0, 0, videoWidth, videoHeight);
         
         // Use lower quality to reduce file size
-        const imageData = canvas.toDataURL('image/jpeg', 0.6);
+        const imageData = canvas.toDataURL('image/jpeg', 0.7);
         setCapturedImage(imageData);
         stopCamera();
+        setIsCapturing(false);
       }
     }
   };
@@ -90,7 +98,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
     onClose();
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     startCamera();
     return () => {
       stopCamera();
@@ -98,86 +106,294 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Capture Food Image</h3>
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      zIndex: 9999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        padding: '24px',
+        maxWidth: '400px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'hidden',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        animation: 'slideDown 0.3s ease-out'
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '20px'
+        }}>
+          <h3 style={{
+            fontSize: '18px',
+            fontWeight: '600',
+            color: '#1f2937',
+            margin: 0
+          }}>📸 Food Camera</h3>
           <button
             onClick={cancelCapture}
-            className="text-gray-500 hover:text-gray-700"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#6b7280',
+              cursor: 'pointer',
+              padding: '4px',
+              borderRadius: '6px',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.color = '#374151';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#6b7280';
+            }}
           >
-            <X size={24} />
+            <X size={20} />
           </button>
         </div>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div style={{
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#dc2626',
+            padding: '12px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            fontSize: '14px'
+          }}>
             {error}
           </div>
         )}
 
-        <div className="relative">
+        <div style={{ position: 'relative' }}>
           {capturedImage ? (
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <img
                 src={capturedImage}
                 alt="Captured food"
-                className="w-full h-64 object-cover rounded-lg"
+                style={{
+                  width: '100%',
+                  height: '200px',
+                  objectFit: 'cover',
+                  borderRadius: '12px',
+                  border: '2px solid #e5e7eb'
+                }}
               />
-              <div className="flex space-x-3">
+              <div style={{ display: 'flex', gap: '12px' }}>
                 <button
                   onClick={retakePhoto}
-                  className="flex-1 flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '12px 16px',
+                    border: '2px solid #d1d5db',
+                    borderRadius: '10px',
+                    backgroundColor: 'white',
+                    color: '#374151',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f9fafb';
+                    e.currentTarget.style.borderColor = '#9ca3af';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white';
+                    e.currentTarget.style.borderColor = '#d1d5db';
+                  }}
                 >
-                  <RotateCcw size={18} className="mr-2" />
+                  <RotateCcw size={16} style={{ marginRight: '8px' }} />
                   Retake
                 </button>
                 <button
                   onClick={confirmImage}
-                  className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '12px 16px',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    boxShadow: '0 4px 14px 0 rgba(16, 185, 129, 0.3)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#059669';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px 0 rgba(16, 185, 129, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#10b981';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(16, 185, 129, 0.3)';
+                  }}
                 >
-                  <Check size={18} className="mr-2" />
-                  Use This Photo
+                  <Check size={16} style={{ marginRight: '8px' }} />
+                  Use Photo
                 </button>
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="relative bg-gray-100 rounded-lg overflow-hidden">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-64 object-cover"
-                />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{
+                position: 'relative',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                height: '200px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {isLoading ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    color: '#6b7280'
+                  }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      border: '3px solid #e5e7eb',
+                      borderTop: '3px solid #3b82f6',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                      marginBottom: '12px'
+                    }}></div>
+                    <p style={{ margin: 0, fontSize: '14px' }}>Starting camera...</p>
+                  </div>
+                ) : (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                )}
                 <canvas
                   ref={canvasRef}
-                  className="hidden"
+                  style={{ display: 'none' }}
                 />
               </div>
               
-              <div className="text-center">
+              <div style={{ textAlign: 'center' }}>
                 <button
                   onClick={captureImage}
-                  disabled={!stream}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center mx-auto"
+                  disabled={!stream || isLoading}
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    padding: '14px 28px',
+                    borderRadius: '25px',
+                    border: 'none',
+                    cursor: stream && !isLoading ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    margin: '0 auto',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease',
+                    opacity: stream && !isLoading ? 1 : 0.6,
+                    boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (stream && !isLoading) {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 12px 35px rgba(102, 126, 234, 0.4)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.3)';
+                  }}
                 >
-                  <Camera size={20} className="mr-2" />
-                  Capture Photo
+                  {isCapturing ? (
+                    <>
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        border: '2px solid rgba(255,255,255,0.3)',
+                        borderTop: '2px solid white',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                        marginRight: '8px'
+                      }}></div>
+                      Capturing...
+                    </>
+                  ) : (
+                    <>
+                      <Zap size={20} style={{ marginRight: '8px' }} />
+                      Capture Food
+                    </>
+                  )}
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        <div className="mt-4 text-sm text-gray-600 text-center">
+        <div style={{
+          marginTop: '16px',
+          fontSize: '13px',
+          color: '#6b7280',
+          textAlign: 'center',
+          lineHeight: '1.4'
+        }}>
           {capturedImage 
-            ? "Review your photo and confirm to analyze with AI"
-            : "Point your camera at the food and tap capture"
+            ? "✨ Review your photo and confirm to analyze with AI"
+            : "📱 Point your camera at the food and tap capture"
           }
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };

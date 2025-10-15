@@ -276,27 +276,52 @@ const MealLogging: React.FC = () => {
         </h3>
 
         {/* Quick Camera Button */}
-        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+        <div style={{ 
+          marginBottom: '24px', 
+          textAlign: 'center',
+          padding: '20px',
+          background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+          borderRadius: '16px',
+          border: '2px dashed #cbd5e1'
+        }}>
           <button
             type="button"
             onClick={() => setShowCamera(true)}
-            className="btn"
-            style={{ 
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-              color: 'white', 
+            style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
               border: 'none',
-              padding: '12px 24px',
-              fontSize: '16px',
-              fontWeight: '600',
+              padding: '16px 32px',
+              fontSize: '18px',
+              fontWeight: '700',
               display: 'flex',
               alignItems: 'center',
-              margin: '0 auto'
+              margin: '0 auto',
+              borderRadius: '25px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)',
+              textTransform: 'none'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-3px)';
+              e.currentTarget.style.boxShadow = '0 12px 35px rgba(102, 126, 234, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.3)';
             }}
           >
-            <Camera size={20} style={{ marginRight: '8px' }} />
+            <Camera size={24} style={{ marginRight: '12px' }} />
             📸 Take Photo of Food
           </button>
-          <p style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
+          <p style={{ 
+            marginTop: '12px', 
+            fontSize: '15px', 
+            color: '#64748b',
+            fontWeight: '500',
+            marginBottom: '0'
+          }}>
             Point your camera at food for instant AI recognition
           </p>
         </div>
