@@ -11,6 +11,8 @@ interface Food {
   carbs_per_100g: number;
   fat_per_100g: number;
   category: string;
+  isAIResult?: boolean;
+  quantity?: number;
 }
 
 interface Meal {

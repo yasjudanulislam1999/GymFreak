@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, RotateCcw, Check, Zap } from 'lucide-react';
+import { X, RotateCcw, Check } from 'lucide-react';
 
 interface CameraCaptureProps {
   onImageCapture: (imageData: string) => void;
