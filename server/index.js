@@ -269,40 +269,82 @@ Respond as their personal AI diet coach:`;
 // AI Food Recognition using Edamam API
 async function recognizeFoodWithAI(foodDescription) {
   try {
-    // Using Edamam Food Database API (free tier)
-    const APP_ID = process.env.EDAMAM_APP_ID || 'your-app-id';
-    const APP_KEY = process.env.EDAMAM_APP_KEY || 'your-app-key';
+    console.log('AI Food Recognition - Input:', foodDescription);
     
-    // For demo purposes, we'll use a mock response if no API keys are provided
-    if (APP_ID === 'your-app-id' || APP_KEY === 'your-app-key') {
+    // Check if OpenAI API key is configured
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
+      console.log('OpenAI API key not configured - using mock recognition');
       return mockFoodRecognition(foodDescription);
     }
 
-    const response = await axios.get('https://api.edamam.com/api/food-database/v2/parser', {
-      params: {
-        q: foodDescription,
-        app_id: APP_ID,
-        app_key: APP_KEY,
-        limit: 1
-      }
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `You are a nutrition expert specializing in all cuisines worldwide. Analyze food descriptions and provide accurate nutritional information for any cuisine (Indian, Chinese, Italian, Mexican, Middle Eastern, Thai, Japanese, Korean, etc.).
+
+For complex meals with multiple components, break them down and calculate total nutrition.
+
+Return ONLY a JSON object with this structure:
+{
+  "name": "food name",
+  "calories_per_100g": 100,
+  "protein_per_100g": 10,
+  "carbs_per_100g": 15,
+  "fat_per_100g": 5,
+  "estimated_quantity": 150,
+  "unit": "g",
+  "confidence": 0.9
+}
+
+Be specific about the food and provide realistic nutritional values based on the actual cuisine and ingredients. For example:
+- Indian roti: ~300 cal/100g, high carbs, low protein
+- Chicken karahi: ~200 cal/100g, high protein, moderate fat
+- Biryani: ~250 cal/100g, balanced macros
+- Pasta: ~130 cal/100g, high carbs
+- Pizza: ~300 cal/100g, balanced macros`
+        },
+        {
+          role: "user",
+          content: `Analyze this food description and provide accurate nutritional information: "${foodDescription}"`
+        }
+      ],
+      max_tokens: 300
     });
 
-    if (response.data.hints && response.data.hints.length > 0) {
-      const food = response.data.hints[0].food;
-      const nutrients = food.nutrients;
-      
+    const aiResponse = response.choices[0].message.content;
+    console.log('AI Response:', aiResponse);
+
+    try {
+      // Clean the response to extract JSON
+      let cleanResponse = aiResponse.trim();
+      if (cleanResponse.includes('```json')) {
+        cleanResponse = cleanResponse.split('```json')[1].split('```')[0];
+      } else if (cleanResponse.includes('```')) {
+        cleanResponse = cleanResponse.split('```')[1].split('```')[0];
+      }
+
+      const foodData = JSON.parse(cleanResponse);
+      console.log('Parsed food data:', foodData);
+
       return {
-        name: food.label,
-        calories: Math.round(nutrients.ENERC_KCAL || 0),
-        protein: Math.round((nutrients.PROCNT || 0) * 10) / 10,
-        carbs: Math.round((nutrients.CHOCDF || 0) * 10) / 10,
-        fat: Math.round((nutrients.FAT || 0) * 10) / 10,
-        confidence: 'high',
-        source: 'edamam'
+        name: foodData.name || foodDescription,
+        calories: Math.round(foodData.calories_per_100g || 0),
+        protein: Math.round((foodData.protein_per_100g || 0) * 10) / 10,
+        carbs: Math.round((foodData.carbs_per_100g || 0) * 10) / 10,
+        fat: Math.round((foodData.fat_per_100g || 0) * 10) / 10,
+        quantity: foodData.estimated_quantity || 100,
+        unit: foodData.unit || 'g',
+        confidence: Math.round((foodData.confidence || 0.5) * 100),
+        source: 'OpenAI Text Recognition'
       };
+    } catch (parseError) {
+      console.error('Error parsing AI response:', parseError);
+      console.error('Raw AI response:', aiResponse);
+      return mockFoodRecognition(foodDescription);
     }
-    
-    return null;
+
   } catch (error) {
     console.error('AI Food Recognition Error:', error.message);
     return mockFoodRecognition(foodDescription);
@@ -312,6 +354,55 @@ async function recognizeFoodWithAI(foodDescription) {
 // Enhanced mock food recognition for complex meals
 function mockFoodRecognition(foodDescription) {
   const lowerDescription = foodDescription.toLowerCase();
+  
+  // Debug logs removed for production
+  
+  // Check for specific multi-component patterns first
+  if (lowerDescription.includes('chicken') && lowerDescription.includes('rice')) {
+    // Extract quantities
+    const chickenMatch = lowerDescription.match(/(\d+(?:\.\d+)?)\s*(?:chicken breast|chicken)/);
+    const riceMatch = lowerDescription.match(/(\d+(?:\.\d+)?)\s*(?:g|gram|grams)?\s*(?:of\s*)?(?:rice|white rice|brown rice)/);
+    
+    if (chickenMatch && riceMatch) {
+      const chickenQuantity = parseFloat(chickenMatch[1]) * 150; // Assume 150g per chicken breast
+      const riceQuantity = parseFloat(riceMatch[1]);
+      
+      // Calculate nutrition for chicken and rice
+      
+      // Calculate nutrition
+      const chickenCalories = (chickenQuantity / 100) * 165; // 165 cal per 100g
+      const chickenProtein = (chickenQuantity / 100) * 31;
+      const chickenCarbs = (chickenQuantity / 100) * 0;
+      const chickenFat = (chickenQuantity / 100) * 3.6;
+      
+      const riceCalories = (riceQuantity / 100) * 130; // 130 cal per 100g
+      const riceProtein = (riceQuantity / 100) * 2.7;
+      const riceCarbs = (riceQuantity / 100) * 28;
+      const riceFat = (riceQuantity / 100) * 0.3;
+      
+      const totalCalories = chickenCalories + riceCalories;
+      const totalProtein = chickenProtein + riceProtein;
+      const totalCarbs = chickenCarbs + riceCarbs;
+      const totalFat = chickenFat + riceFat;
+      const totalWeight = chickenQuantity + riceQuantity;
+      
+      // Return combined nutrition
+      
+      return {
+        name: foodDescription,
+        calories: Math.round(totalCalories),
+        protein: Math.round(totalProtein * 10) / 10,
+        carbs: Math.round(totalCarbs * 10) / 10,
+        fat: Math.round(totalFat * 10) / 10,
+        quantity: Math.round(totalWeight),
+        unit: 'g',
+        confidence: 'high',
+        source: 'mock-multi-component'
+      };
+    }
+  }
+  
+  // Fallback to simple recognition for single items
   
   // Enhanced food database with per 100g values
   const foodDatabase = {
@@ -341,51 +432,17 @@ function mockFoodRecognition(foodDescription) {
     'olive oil': { calories: 884, protein: 0, carbs: 0, fat: 100 }
   };
   
-  // Parse complex meal descriptions
-  const mealComponents = parseMealDescription(foodDescription);
-  
-  if (mealComponents.length === 0) {
-    // Fallback to simple recognition
-    return simpleFoodRecognition(foodDescription, foodDatabase);
-  }
-  
-  // Calculate total nutrition for the entire meal
-  let totalCalories = 0;
-  let totalProtein = 0;
-  let totalCarbs = 0;
-  let totalFat = 0;
-  let totalWeight = 0;
-  
-  mealComponents.forEach(component => {
-    const food = foodDatabase[component.name];
-    if (food) {
-      // Convert to 100g base
-      const multiplier = component.quantity / 100;
-      totalCalories += food.calories * multiplier;
-      totalProtein += food.protein * multiplier;
-      totalCarbs += food.carbs * multiplier;
-      totalFat += food.fat * multiplier;
-      totalWeight += component.quantity;
-    }
-  });
-  
-  return {
-    name: foodDescription,
-    calories: Math.round(totalCalories),
-    protein: Math.round(totalProtein * 10) / 10,
-    carbs: Math.round(totalCarbs * 10) / 10,
-    fat: Math.round(totalFat * 10) / 10,
-    quantity: Math.round(totalWeight),
-    unit: 'g',
-    confidence: 'high',
-    source: 'mock-multi-component'
-  };
+  // Fallback to simple recognition
+  return simpleFoodRecognition(foodDescription, foodDatabase);
 }
 
 // Parse meal description to extract individual components
 function parseMealDescription(description) {
   const components = [];
   const lowerDesc = description.toLowerCase();
+  
+  console.log('Parsing meal description:', description);
+  console.log('Lowercase description:', lowerDesc);
   
   // Common patterns for parsing meal descriptions
   const patterns = [
@@ -401,9 +458,20 @@ function parseMealDescription(description) {
     /(\d+(?:\.\d+)?)\s*(?:g|gram|grams)?\s*(?:of\s*)?(rice|white rice|brown rice)\s*(?:and)\s*(\d+(?:\.\d+)?)\s*(?:chicken breast|chicken)/
   ];
   
-  for (const pattern of patterns) {
+  // Test the first pattern manually
+  const testPattern = /(\d+(?:\.\d+)?)\s*(?:chicken breast|chicken)\s*(?:with|and)\s*(\d+(?:\.\d+)?)\s*(?:g|gram|grams)?\s*(?:of\s*)?(rice|white rice|brown rice)/;
+  const testMatch = lowerDesc.match(testPattern);
+  console.log('Test pattern:', testPattern.source);
+  console.log('Test match:', testMatch);
+  
+  for (let i = 0; i < patterns.length; i++) {
+    const pattern = patterns[i];
     const match = lowerDesc.match(pattern);
+    console.log(`Testing pattern ${i}:`, pattern.source);
+    console.log('Match result:', match);
+    
     if (match) {
+      console.log('Pattern matched! Processing...');
       if (pattern.source.includes('chicken breast|chicken.*with.*rice')) {
         // "1 chicken breast with 100g rice"
         components.push({
