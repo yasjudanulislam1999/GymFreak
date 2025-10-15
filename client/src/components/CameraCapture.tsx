@@ -25,37 +25,75 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
         throw new Error('Camera not supported on this device');
       }
 
-      // Get camera stream - try back camera first
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'environment' // Try back camera first
-        } 
-      });
+      // Get camera stream - try back camera first, then front camera
+      let mediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'environment' // Try back camera first
+          } 
+        });
+        console.log('✅ Back camera accessed');
+      } catch (backCameraError) {
+        console.log('⚠️ Back camera failed, trying front camera:', backCameraError);
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              facingMode: 'user' // Try front camera
+            } 
+          });
+          console.log('✅ Front camera accessed');
+        } catch (frontCameraError) {
+          console.log('⚠️ Front camera failed, trying any camera:', frontCameraError);
+          mediaStream = await navigator.mediaDevices.getUserMedia({ 
+            video: true // Try any available camera
+          });
+          console.log('✅ Any camera accessed');
+        }
+      }
       
       console.log('✅ Camera access granted');
       setStream(mediaStream);
       
       if (videoRef.current) {
         const video = videoRef.current;
+        
+        // Set video properties before setting srcObject
+        video.muted = true;
+        video.playsInline = true;
+        video.autoplay = true;
+        
+        // Set the stream
         video.srcObject = mediaStream;
         
-        // Force video to play
-        video.play().catch(err => {
-          console.log('Video play error:', err);
-        });
+        console.log('📹 Video element configured, starting playback...');
         
-        // Longer timeout - if video doesn't load in 5 seconds, show error
+        // Force video to play
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log('✅ Video started playing');
+          }).catch(err => {
+            console.log('❌ Video play error:', err);
+            setIsLoading(false);
+            setError('Video failed to play. Please try again or use text input.');
+          });
+        }
+        
+        // Shorter timeout - if video doesn't load in 3 seconds, show error
         const timeoutId = setTimeout(() => {
           console.log('⏰ Camera timeout - video not loading');
           setIsLoading(false);
           setError('Camera is taking too long to load. Please try again or use text input.');
-        }, 5000);
+        }, 3000);
         
         // Stop loading when video can play
         const handleCanPlay = () => {
-          console.log('✅ Video ready');
+          console.log('✅ Video can play');
           clearTimeout(timeoutId);
           setIsLoading(false);
         };
@@ -66,8 +104,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
           setIsLoading(false);
         };
         
-        const handleError = () => {
-          console.log('❌ Video error');
+        const handleLoadedMetadata = () => {
+          console.log('✅ Video metadata loaded');
+          clearTimeout(timeoutId);
+          setIsLoading(false);
+        };
+        
+        const handleError = (e: any) => {
+          console.log('❌ Video error:', e);
           clearTimeout(timeoutId);
           setIsLoading(false);
           setError('Camera failed to load. Please use text input instead.');
@@ -75,9 +119,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
         
         video.addEventListener('canplay', handleCanPlay, { once: true });
         video.addEventListener('loadeddata', handleLoadedData, { once: true });
+        video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
         video.addEventListener('error', handleError, { once: true });
       } else {
+        console.log('❌ Video ref not available');
         setIsLoading(false);
+        setError('Video element not available. Please refresh and try again.');
       }
     } catch (err: any) {
       console.error('❌ Camera error:', err);
@@ -352,11 +399,16 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                     playsInline
                     muted
                     onClick={captureImage}
+                    onLoadStart={() => console.log('📹 Video load started')}
+                    onCanPlay={() => console.log('📹 Video can play')}
+                    onLoadedData={() => console.log('📹 Video data loaded')}
+                    onError={(e) => console.log('📹 Video error:', e)}
                     style={{
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      backgroundColor: '#000' // Add background to see if video is there
                     }}
                   />
                 ) : (
