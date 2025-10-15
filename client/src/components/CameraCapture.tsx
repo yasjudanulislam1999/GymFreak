@@ -217,30 +217,35 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
             padding: '12px',
             borderRadius: '8px',
             marginBottom: '16px',
-            fontSize: '14px'
+            fontSize: '14px',
+            textAlign: 'center'
           }}>
-            <div style={{ marginBottom: '8px' }}>{error}</div>
+            <div style={{ marginBottom: '12px' }}>{error}</div>
             <button
-              onClick={startCamera}
+              onClick={() => {
+                console.log('📝 Switching to text input');
+                onClose();
+              }}
               style={{
-                backgroundColor: '#dc2626',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 color: 'white',
                 border: 'none',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '12px',
+                padding: '10px 20px',
+                borderRadius: '20px',
+                fontSize: '14px',
                 cursor: 'pointer',
-                fontWeight: '500',
-                transition: 'opacity 0.2s ease'
+                fontWeight: '600',
+                transition: 'opacity 0.2s ease',
+                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = '0.8';
+                e.currentTarget.style.opacity = '0.9';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.opacity = '1';
               }}
             >
-              🔄 Try Again
+              📝 Use Text Input Instead
             </button>
           </div>
         )}
@@ -352,54 +357,32 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                       marginBottom: '12px'
                     }}></div>
                     <p style={{ margin: '0 0 12px 0', fontSize: '14px' }}>Starting camera...</p>
-                    <div style={{ display: 'flex', gap: '8px', flexDirection: 'column', alignItems: 'center' }}>
-                      <button
-                        onClick={startCamera}
-                        style={{
-                          backgroundColor: '#3b82f6',
-                          color: 'white',
-                          border: 'none',
-                          padding: '6px 12px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                          fontWeight: '500',
-                          transition: 'opacity 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '0.8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                        }}
-                      >
-                        🔄 Retry Camera
-                      </button>
+                    <div style={{ textAlign: 'center' }}>
                       <button
                         onClick={() => {
-                          console.log('🛑 Manually stopping loading state');
-                          setIsLoading(false);
-                          setError('Camera loading was manually stopped. Click "Retry Camera" to try again.');
+                          console.log('📝 Switching to text input');
+                          onClose();
                         }}
                         style={{
-                          backgroundColor: '#6b7280',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                           color: 'white',
                           border: 'none',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: '10px',
+                          padding: '12px 24px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          borderRadius: '20px',
                           cursor: 'pointer',
-                          fontWeight: '500',
-                          transition: 'opacity 0.2s ease'
+                          transition: 'opacity 0.2s ease',
+                          boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '0.8';
+                          e.currentTarget.style.opacity = '0.9';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.opacity = '1';
                         }}
                       >
-                        ⏹️ Stop Loading
+                        📝 Use Text Input Instead
                       </button>
                     </div>
                   </div>
@@ -477,56 +460,38 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                     ⚡ Capture Food
                   </button>
                 ) : (
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                      <button
-                        onClick={startCamera}
-                        style={{
-                          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                          color: 'white',
-                          border: 'none',
-                          padding: '12px 24px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          borderRadius: '20px',
-                          cursor: 'pointer',
-                          transition: 'opacity 0.2s ease',
-                          boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '0.9';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                        }}
-                      >
-                        🔄 Try Camera Again
-                      </button>
-                      <button
-                        onClick={() => {
-                          console.log('📝 Switching to text input');
-                          onClose();
-                        }}
-                        style={{
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                          color: 'white',
-                          border: 'none',
-                          padding: '12px 24px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          borderRadius: '20px',
-                          cursor: 'pointer',
-                          transition: 'opacity 0.2s ease',
-                          boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '0.9';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                        }}
-                      >
-                        📝 Use Text Input Instead
-                      </button>
+                  <div style={{ textAlign: 'center' }}>
+                    <button
+                      onClick={() => {
+                        console.log('📝 Switching to text input');
+                        onClose();
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '16px 32px',
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        borderRadius: '25px',
+                        cursor: 'pointer',
+                        transition: 'opacity 0.2s ease',
+                        boxShadow: '0 8px 25px rgba(16, 185, 129, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto',
+                        minWidth: '250px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.opacity = '0.9';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.opacity = '1';
+                      }}
+                    >
+                      📝 Use Text Input Instead
+                    </button>
                   </div>
                 )}
               </div>
