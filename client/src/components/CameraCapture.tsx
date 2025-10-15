@@ -16,89 +16,43 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
 
   const startCamera = useCallback(async () => {
     try {
-      console.log('🎥 Starting camera initialization...');
+      console.log('🎥 Starting camera...');
       setError(null);
       setIsLoading(true);
       
       // Check if getUserMedia is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.error('❌ Camera not supported on this device');
         throw new Error('Camera not supported on this device');
       }
 
-      console.log('📱 Requesting camera access...');
+      // Get camera stream
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
+      });
       
-      // Try basic camera access first
-      let mediaStream;
-      try {
-        console.log('🔄 Trying basic camera access...');
-        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        console.log('✅ Basic camera access successful');
-      } catch (basicError) {
-        console.log('❌ Basic camera failed, trying with constraints:', basicError);
-        // Try with specific constraints
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          }
-        });
-        console.log('✅ Constrained camera access successful');
-      }
-      
-      console.log('📹 Setting up video stream...');
+      console.log('✅ Camera access granted');
       setStream(mediaStream);
       
       if (videoRef.current) {
-        const video = videoRef.current;
-        video.srcObject = mediaStream;
+        videoRef.current.srcObject = mediaStream;
         
-        console.log('🎬 Video element configured, waiting for load...');
+        // Simple timeout - if video doesn't load in 2 seconds, stop loading
+        setTimeout(() => {
+          console.log('⏰ Camera timeout - stopping loading');
+          setIsLoading(false);
+        }, 2000);
         
-        // Simple approach - just wait for the video to be ready
-        const checkVideoReady = () => {
-          if (video.readyState >= 2) { // HAVE_CURRENT_DATA
-            console.log('✅ Video is ready to play');
-            setIsLoading(false);
-            return true;
-          }
-          return false;
-        };
-        
-        // Check immediately
-        if (checkVideoReady()) {
-          return;
-        }
-        
-        // Set up event listeners
-        const handleVideoReady = () => {
-          console.log('✅ Video loaded via event listener');
+        // Stop loading when video can play
+        const handleCanPlay = () => {
+          console.log('✅ Video ready');
           setIsLoading(false);
         };
         
-        video.addEventListener('loadeddata', handleVideoReady);
-        video.addEventListener('canplay', handleVideoReady);
-        video.addEventListener('loadedmetadata', handleVideoReady);
-        
-        // Timeout after 3 seconds
-        const timeout = setTimeout(() => {
-          console.log('⏰ Video loading timeout, forcing stop loading');
-          setIsLoading(false);
-        }, 3000);
-        
-        // Clean up when video loads
-        const cleanup = () => {
-          clearTimeout(timeout);
-          video.removeEventListener('loadeddata', handleVideoReady);
-          video.removeEventListener('canplay', handleVideoReady);
-          video.removeEventListener('loadedmetadata', handleVideoReady);
-        };
-        
-        video.addEventListener('loadeddata', cleanup, { once: true });
-        video.addEventListener('canplay', cleanup, { once: true });
-        video.addEventListener('loadedmetadata', cleanup, { once: true });
+        videoRef.current.addEventListener('canplay', handleCanPlay, { once: true });
       } else {
-        console.error('❌ Video ref not available');
         setIsLoading(false);
       }
     } catch (err: any) {
@@ -411,6 +365,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                         onClick={() => {
                           console.log('🛑 Manually stopping loading state');
                           setIsLoading(false);
+                          setError('Camera loading was manually stopped. Click "Retry Camera" to try again.');
                         }}
                         style={{
                           backgroundColor: '#6b7280',
@@ -433,7 +388,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                       </button>
                     </div>
                   </div>
-                ) : (
+                ) : stream ? (
                   <video
                     ref={videoRef}
                     autoPlay
@@ -445,6 +400,29 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                       objectFit: 'cover'
                     }}
                   />
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: '200px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '8px',
+                    border: '2px dashed #d1d5db',
+                    color: '#6b7280',
+                    fontSize: '14px',
+                    textAlign: 'center',
+                    padding: '20px'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '24px', marginBottom: '8px' }}>📷</div>
+                      <div>Camera not available</div>
+                      <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                        Click "Retry Camera" to try again
+                      </div>
+                    </div>
+                  </div>
                 )}
                 <canvas
                   ref={canvasRef}
@@ -453,41 +431,93 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
               </div>
               
               <div style={{ textAlign: 'center' }}>
-                <button
-                  onClick={captureImage}
-                  disabled={!stream || isLoading}
-                  style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    padding: '14px 28px',
-                    borderRadius: '25px',
-                    border: 'none',
-                    cursor: stream && !isLoading ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    margin: '0 auto',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    transition: 'all 0.3s ease',
-                    opacity: stream && !isLoading ? 1 : 0.6,
-                    boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (stream && !isLoading) {
+                {stream ? (
+                  <button
+                    onClick={captureImage}
+                    style={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: 'white',
+                      padding: '14px 28px',
+                      borderRadius: '25px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      margin: '0 auto',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
+                    }}
+                    onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translateY(-2px)';
                       e.currentTarget.style.boxShadow = '0 12px 35px rgba(102, 126, 234, 0.4)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.3)';
-                  }}
-                >
-                  <>
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.3)';
+                    }}
+                  >
                     <Zap size={20} style={{ marginRight: '8px' }} />
-                    Capture Food
-                  </>
-                </button>
+                    ⚡ Capture Food
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                    <button
+                      onClick={startCamera}
+                      style={{
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '12px 24px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        borderRadius: '20px',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.4)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.3)';
+                      }}
+                    >
+                      🔄 Try Camera Again
+                    </button>
+                    <button
+                      onClick={() => {
+                        console.log('📝 Switching to text input');
+                        onClose();
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '12px 24px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        borderRadius: '20px',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.3)';
+                      }}
+                    >
+                      📝 Use Text Input Instead
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
