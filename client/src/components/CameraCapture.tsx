@@ -214,39 +214,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
             backgroundColor: '#fef2f2',
             border: '1px solid #fecaca',
             color: '#dc2626',
-            padding: '12px',
+            padding: '16px',
             borderRadius: '8px',
             marginBottom: '16px',
             fontSize: '14px',
             textAlign: 'center'
           }}>
-            <div style={{ marginBottom: '12px' }}>{error}</div>
-            <button
-              onClick={() => {
-                console.log('📝 Switching to text input');
-                onClose();
-              }}
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: '20px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                transition: 'opacity 0.2s ease',
-                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = '0.9';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = '1';
-              }}
-            >
-              📝 Use Text Input Instead
-            </button>
+            <div style={{ marginBottom: '8px' }}>⚠️ Camera not available</div>
+            <div style={{ fontSize: '12px', opacity: 0.8 }}>Please use text input to describe your food</div>
           </div>
         )}
 
@@ -356,35 +331,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                       animation: 'spin 1s linear infinite',
                       marginBottom: '12px'
                     }}></div>
-                    <p style={{ margin: '0 0 12px 0', fontSize: '14px' }}>Starting camera...</p>
-                    <div style={{ textAlign: 'center' }}>
-                      <button
-                        onClick={() => {
-                          console.log('📝 Switching to text input');
-                          onClose();
-                        }}
-                        style={{
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                          color: 'white',
-                          border: 'none',
-                          padding: '12px 24px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          borderRadius: '20px',
-                          cursor: 'pointer',
-                          transition: 'opacity 0.2s ease',
-                          boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '0.9';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                        }}
-                      >
-                        📝 Use Text Input Instead
-                      </button>
-                    </div>
+                    <p style={{ margin: '0', fontSize: '14px' }}>Starting camera...</p>
                   </div>
                 ) : stream ? (
                   <video
@@ -392,10 +339,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                     autoPlay
                     playsInline
                     muted
+                    onClick={captureImage}
                     style={{
                       width: '100%',
                       height: '100%',
-                      objectFit: 'cover'
+                      objectFit: 'cover',
+                      cursor: 'pointer'
                     }}
                   />
                 ) : (
@@ -417,7 +366,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
                       <div style={{ fontSize: '24px', marginBottom: '8px' }}>📷</div>
                       <div>Camera not available</div>
                       <div style={{ fontSize: '12px', marginTop: '4px' }}>
-                        Click "Retry Camera" to try again
+                        Please use text input instead
                       </div>
                     </div>
                   </div>
@@ -430,68 +379,23 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
               
               <div style={{ textAlign: 'center' }}>
                 {stream ? (
-                  <button
-                    onClick={captureImage}
-                    style={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      padding: '14px 28px',
-                      borderRadius: '25px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      margin: '0 auto',
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      transition: 'all 0.3s ease',
-                      boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '0.9';
-                      e.currentTarget.style.boxShadow = '0 12px 35px rgba(102, 126, 234, 0.4)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = '1';
-                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.3)';
-                    }}
-                  >
-                    <Zap size={20} style={{ marginRight: '8px' }} />
-                    ⚡ Capture Food
-                  </button>
+                  <div style={{ 
+                    color: '#10b981', 
+                    fontSize: '14px', 
+                    fontWeight: '500',
+                    textAlign: 'center',
+                    padding: '20px'
+                  }}>
+                    📷 Camera ready - Click anywhere to capture
+                  </div>
                 ) : (
-                  <div style={{ textAlign: 'center' }}>
-                    <button
-                      onClick={() => {
-                        console.log('📝 Switching to text input');
-                        onClose();
-                      }}
-                      style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '16px 32px',
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        borderRadius: '25px',
-                        cursor: 'pointer',
-                        transition: 'opacity 0.2s ease',
-                        boxShadow: '0 8px 25px rgba(16, 185, 129, 0.3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto',
-                        minWidth: '250px'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.opacity = '0.9';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = '1';
-                      }}
-                    >
-                      📝 Use Text Input Instead
-                    </button>
+                  <div style={{ 
+                    color: '#6b7280', 
+                    fontSize: '14px',
+                    textAlign: 'center',
+                    padding: '20px'
+                  }}>
+                    📝 Camera not available - Please use text input
                   </div>
                 )}
               </div>
