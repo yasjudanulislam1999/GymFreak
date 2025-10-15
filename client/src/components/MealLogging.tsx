@@ -85,7 +85,12 @@ const MealLogging: React.FC = () => {
       const response = await axios.post('/api/ai/recognize-food', {
         foodDescription: aiInput
       });
-      setAiResult(response.data);
+      
+      // Convert single food result to array format to match image recognition
+      const recognizedFood = response.data;
+      setAiResult([recognizedFood]);
+      setShowAiSection(true);
+      setMessage(`AI recognized: ${recognizedFood.name}`);
     } catch (error: any) {
       setMessage('AI recognition failed: ' + (error.response?.data?.error || error.message));
     } finally {
