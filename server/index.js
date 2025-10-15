@@ -266,7 +266,109 @@ Respond as their personal AI diet coach:`;
   }
 }
 
-// AI Food Recognition using Edamam API
+// Extract quantity from user's food description
+function extractQuantityFromDescription(description) {
+  const lowerDesc = description.toLowerCase();
+  
+  // Patterns to match quantities with different units
+  const patterns = [
+    // 250gm, 500gm, 300gm, etc.
+    /(\d+(?:\.\d+)?)\s*(?:gm|gram|grams?)\b/,
+    // 250g, 500g, 300g, etc.
+    /(\d+(?:\.\d+)?)\s*g\b/,
+    // 250 kg, 500 kg, etc.
+    /(\d+(?:\.\d+)?)\s*(?:kg|kilogram|kilograms?)\b/,
+    // 2.5 kg, 1.5 kg, etc.
+    /(\d+(?:\.\d+)?)\s*(?:kg|kilogram|kilograms?)\b/,
+    // 1 cup, 2 cups, etc.
+    /(\d+(?:\.\d+)?)\s*(?:cup|cups)\b/,
+    // 1 slice, 2 slices, etc.
+    /(\d+(?:\.\d+)?)\s*(?:slice|slices)\b/,
+    // 1 piece, 2 pieces, etc.
+    /(\d+(?:\.\d+)?)\s*(?:piece|pieces)\b/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = lowerDesc.match(pattern);
+    if (match) {
+      let quantity = parseFloat(match[1]);
+      
+      // Convert kg to grams
+      if (pattern.source.includes('kg')) {
+        quantity = quantity * 1000;
+      }
+      
+      console.log(`Extracted quantity: ${quantity}g from "${description}"`);
+      return quantity;
+    }
+  }
+  
+  console.log(`No quantity found in "${description}"`);
+  return null;
+}
+
+// Normalize nutritional values to ensure consistency
+function normalizeNutritionValues(foodName, nutrition) {
+  const lowerName = foodName.toLowerCase();
+  
+  // Define standard nutritional values for common foods to ensure consistency
+  const standardValues = {
+    'margherita pizza': { calories: 250, protein: 11, carbs: 31, fat: 10 },
+    'pizza margherita': { calories: 250, protein: 11, carbs: 31, fat: 10 },
+    'margherita': { calories: 250, protein: 11, carbs: 31, fat: 10 },
+    'pepperoni pizza': { calories: 280, protein: 13, carbs: 30, fat: 12 },
+    'cheese pizza': { calories: 240, protein: 10, carbs: 32, fat: 9 },
+    'pasta': { calories: 130, protein: 5, carbs: 25, fat: 1 },
+    'spaghetti': { calories: 130, protein: 5, carbs: 25, fat: 1 },
+    'chicken breast': { calories: 165, protein: 31, carbs: 0, fat: 3.6 },
+    'rice': { calories: 130, protein: 2.7, carbs: 28, fat: 0.3 },
+    'white rice': { calories: 130, protein: 2.7, carbs: 28, fat: 0.3 },
+    'brown rice': { calories: 111, protein: 2.6, carbs: 23, fat: 0.9 },
+    'roti': { calories: 300, protein: 8, carbs: 50, fat: 6 },
+    'chicken karahi': { calories: 200, protein: 20, carbs: 5, fat: 10 },
+    'biryani': { calories: 250, protein: 12, carbs: 35, fat: 8 },
+    'pad thai': { calories: 150, protein: 10, carbs: 20, fat: 5 },
+    'pad thai with shrimp': { calories: 150, protein: 10, carbs: 20, fat: 5 },
+    'burger': { calories: 350, protein: 25, carbs: 30, fat: 15 },
+    'hamburger': { calories: 350, protein: 25, carbs: 30, fat: 15 },
+    'sandwich': { calories: 200, protein: 15, carbs: 25, fat: 8 },
+    'salad': { calories: 50, protein: 3, carbs: 8, fat: 2 },
+    'chicken salad': { calories: 120, protein: 15, carbs: 8, fat: 4 },
+    'eggs': { calories: 155, protein: 13, carbs: 1.1, fat: 11 },
+    'egg': { calories: 155, protein: 13, carbs: 1.1, fat: 11 },
+    'bread': { calories: 265, protein: 9, carbs: 49, fat: 3.2 },
+    'toast': { calories: 265, protein: 9, carbs: 49, fat: 3.2 },
+    'apple': { calories: 52, protein: 0.3, carbs: 14, fat: 0.2 },
+    'banana': { calories: 89, protein: 1.1, carbs: 23, fat: 0.3 },
+    'orange': { calories: 47, protein: 0.9, carbs: 12, fat: 0.1 },
+    'milk': { calories: 42, protein: 3.4, carbs: 5, fat: 1 },
+    'yogurt': { calories: 59, protein: 10, carbs: 3.6, fat: 0.4 },
+    'cheese': { calories: 113, protein: 7, carbs: 1, fat: 9 },
+    'butter': { calories: 717, protein: 0.9, carbs: 0.1, fat: 81 },
+    'olive oil': { calories: 884, protein: 0, carbs: 0, fat: 100 },
+    'avocado': { calories: 160, protein: 2, carbs: 9, fat: 15 },
+    'almonds': { calories: 579, protein: 21, carbs: 22, fat: 50 },
+    'peanut butter': { calories: 588, protein: 25, carbs: 20, fat: 50 }
+  };
+  
+  // Find matching standard values
+  for (const [key, standard] of Object.entries(standardValues)) {
+    if (lowerName.includes(key)) {
+      console.log(`Using standard values for: ${key}`);
+      return standard;
+    }
+  }
+  
+  // If no standard values found, use the AI values but round them for consistency
+  return {
+    calories: Math.round(nutrition.calories / 5) * 5, // Round to nearest 5
+    protein: Math.round(nutrition.protein * 2) / 2,   // Round to nearest 0.5
+    carbs: Math.round(nutrition.carbs * 2) / 2,       // Round to nearest 0.5
+    fat: Math.round(nutrition.fat * 2) / 2            // Round to nearest 0.5
+  };
+}
+
+// AI Food Recognition using OpenAI
 async function recognizeFoodWithAI(foodDescription) {
   try {
     console.log('AI Food Recognition - Input:', foodDescription);
@@ -328,13 +430,36 @@ Be specific about the food and provide realistic nutritional values based on the
       const foodData = JSON.parse(cleanResponse);
       console.log('Parsed food data:', foodData);
 
+      // Extract user-specified quantity from the food description
+      const userQuantity = extractQuantityFromDescription(foodDescription);
+      const actualQuantity = userQuantity || foodData.estimated_quantity || 100;
+      
+      // Normalize nutritional values to ensure consistency (per 100g)
+      const normalizedNutrition = normalizeNutritionValues(foodData.name || foodDescription, {
+        calories: foodData.calories_per_100g || 0,
+        protein: foodData.protein_per_100g || 0,
+        carbs: foodData.carbs_per_100g || 0,
+        fat: foodData.fat_per_100g || 0
+      });
+
+      // Scale nutritional values based on actual quantity
+      const scaleFactor = actualQuantity / 100;
+      const scaledNutrition = {
+        calories: normalizedNutrition.calories * scaleFactor,
+        protein: normalizedNutrition.protein * scaleFactor,
+        carbs: normalizedNutrition.carbs * scaleFactor,
+        fat: normalizedNutrition.fat * scaleFactor
+      };
+
+      console.log(`Scaling nutrition: ${actualQuantity}g (${scaleFactor}x) - Calories: ${normalizedNutrition.calories} -> ${scaledNutrition.calories}`);
+
       return {
         name: foodData.name || foodDescription,
-        calories: Math.round(foodData.calories_per_100g || 0),
-        protein: Math.round((foodData.protein_per_100g || 0) * 10) / 10,
-        carbs: Math.round((foodData.carbs_per_100g || 0) * 10) / 10,
-        fat: Math.round((foodData.fat_per_100g || 0) * 10) / 10,
-        quantity: foodData.estimated_quantity || 100,
+        calories: Math.round(scaledNutrition.calories),
+        protein: Math.round(scaledNutrition.protein * 10) / 10,
+        carbs: Math.round(scaledNutrition.carbs * 10) / 10,
+        fat: Math.round(scaledNutrition.fat * 10) / 10,
+        quantity: actualQuantity,
         unit: foodData.unit || 'g',
         confidence: Math.round((foodData.confidence || 0.5) * 100),
         source: 'OpenAI Text Recognition'
