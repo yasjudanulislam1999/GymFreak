@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, RotateCcw, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, X } from 'lucide-react';
 
 interface CameraCaptureProps {
   onImageCapture: (imageData: string) => void;
@@ -14,143 +14,140 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const startCamera = useCallback(async () => {
+  // Start camera when component mounts
+  useEffect(() => {
+    startCamera();
+    
+    // Add timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      if (isLoading && !stream) {
+        console.log('⏰ Camera loading timeout');
+        setError('Camera is taking too long to load. Please try again or use text input instead.');
+        setIsLoading(false);
+      }
+    }, 10000); // 10 second timeout
+    
+    return () => {
+      clearTimeout(timeout);
+      stopCamera();
+    };
+  }, []);
+
+  // Handle video element setup when stream is available
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      console.log('📹 Setting up video element...', {
+        stream: !!stream,
+        videoElement: !!videoRef.current,
+        videoWidth: videoRef.current.videoWidth,
+        videoHeight: videoRef.current.videoHeight
+      });
+      
+      const video = videoRef.current;
+      
+      // Set video properties
+      video.muted = true;
+      video.playsInline = true;
+      video.autoplay = true;
+      
+      // Set the stream
+      video.srcObject = stream;
+      
+      // Add event listeners for debugging
+      video.addEventListener('loadedmetadata', () => {
+        console.log('📹 Video metadata loaded', {
+          videoWidth: video.videoWidth,
+          videoHeight: video.videoHeight
+        });
+      });
+      
+      video.addEventListener('canplay', () => {
+        console.log('📹 Video can play');
+      });
+      
+      video.addEventListener('error', (e) => {
+        console.error('❌ Video error event:', e);
+        setError('Video failed to load. Please try again.');
+      });
+      
+      // Play the video
+      video.play().then(() => {
+        console.log('✅ Video started playing');
+      }).catch(err => {
+        console.error('❌ Video play error:', err);
+        setError('Failed to start video. Please try again.');
+      });
+    } else if (stream && !videoRef.current) {
+      console.log('⚠️ Stream available but video element not ready yet');
+    }
+  }, [stream]);
+
+  const startCamera = async () => {
     try {
       console.log('🎥 Starting camera...');
-      setError(null);
       setIsLoading(true);
-      
+      setError(null);
+
       // Check if getUserMedia is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera not supported on this device');
       }
 
-      // Get camera stream - try back camera first, then front camera
+      // Request camera access with fallback constraints
       let mediaStream;
       try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: 'environment' // Try back camera first
-          } 
+        // Try back camera first
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
         });
-        console.log('✅ Back camera accessed');
       } catch (backCameraError) {
-        console.log('⚠️ Back camera failed, trying front camera:', backCameraError);
-        try {
-          mediaStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-              width: { ideal: 640 },
-              height: { ideal: 480 },
-              facingMode: 'user' // Try front camera
-            } 
-          });
-          console.log('✅ Front camera accessed');
-        } catch (frontCameraError) {
-          console.log('⚠️ Front camera failed, trying any camera:', frontCameraError);
-          mediaStream = await navigator.mediaDevices.getUserMedia({ 
-            video: true // Try any available camera
-          });
-          console.log('✅ Any camera accessed');
-        }
+        console.log('🔄 Back camera failed, trying front camera...');
+        // Fallback to front camera
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
       }
+
+      console.log('✅ Camera stream obtained', {
+        stream: !!mediaStream,
+        tracks: mediaStream.getTracks().length,
+        videoTrack: mediaStream.getVideoTracks()[0]?.label
+      });
       
-      console.log('✅ Camera access granted');
       setStream(mediaStream);
-      
-      if (videoRef.current) {
-        const video = videoRef.current;
-        
-        // Set video properties before setting srcObject
-        video.muted = true;
-        video.playsInline = true;
-        video.autoplay = true;
-        
-        // Set the stream
-        video.srcObject = mediaStream;
-        
-        console.log('📹 Video element configured, starting playback...');
-        
-        // Force video to play
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            console.log('✅ Video started playing');
-          }).catch(err => {
-            console.log('❌ Video play error:', err);
-            setIsLoading(false);
-            setError('Video failed to play. Please try again or use text input.');
-          });
-        }
-        
-        // Shorter timeout - if video doesn't load in 3 seconds, show error
-        const timeoutId = setTimeout(() => {
-          console.log('⏰ Camera timeout - video not loading');
-          setIsLoading(false);
-          setError('Camera is taking too long to load. Please try again or use text input.');
-        }, 3000);
-        
-        // Stop loading when video can play
-        const handleCanPlay = () => {
-          console.log('✅ Video can play');
-          clearTimeout(timeoutId);
-          setIsLoading(false);
-        };
-        
-        const handleLoadedData = () => {
-          console.log('✅ Video data loaded');
-          clearTimeout(timeoutId);
-          setIsLoading(false);
-        };
-        
-        const handleLoadedMetadata = () => {
-          console.log('✅ Video metadata loaded');
-          clearTimeout(timeoutId);
-          setIsLoading(false);
-        };
-        
-        const handleError = (e: any) => {
-          console.log('❌ Video error:', e);
-          clearTimeout(timeoutId);
-          setIsLoading(false);
-          setError('Camera failed to load. Please use text input instead.');
-        };
-        
-        video.addEventListener('canplay', handleCanPlay, { once: true });
-        video.addEventListener('loadeddata', handleLoadedData, { once: true });
-        video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
-        video.addEventListener('error', handleError, { once: true });
-      } else {
-        console.log('❌ Video ref not available');
-        setIsLoading(false);
-        setError('Video element not available. Please refresh and try again.');
-      }
+      setIsLoading(false); // Stop loading immediately when stream is obtained
+
     } catch (err: any) {
       console.error('❌ Camera error:', err);
-      let errorMessage = 'Unable to access camera. ';
+      let errorMessage = 'Camera access denied or not available. Please use text input instead.';
       
       if (err.name === 'NotAllowedError') {
-        errorMessage += 'Please allow camera permissions and try again.';
+        errorMessage = 'Camera permission denied. Please allow camera access and try again.';
       } else if (err.name === 'NotFoundError') {
-        errorMessage += 'No camera found on this device.';
+        errorMessage = 'No camera found on this device. Please use text input instead.';
       } else if (err.name === 'NotSupportedError') {
-        errorMessage += 'Camera not supported on this device.';
-      } else {
-        errorMessage += `Error: ${err.message}`;
+        errorMessage = 'Camera not supported on this device. Please use text input instead.';
       }
       
       setError(errorMessage);
       setIsLoading(false);
     }
-  }, []);
+  };
 
-  const stopCamera = useCallback(() => {
+  const stopCamera = () => {
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
-  }, [stream]);
+  };
 
   const captureImage = () => {
     if (videoRef.current && canvasRef.current) {
@@ -159,33 +156,23 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
       const context = canvas.getContext('2d');
 
       if (context) {
-        // Resize image to reduce payload size
-        const maxWidth = 600;
-        const maxHeight = 450;
-        let { videoWidth, videoHeight } = video;
-        
-        // Calculate new dimensions maintaining aspect ratio
-        if (videoWidth > maxWidth || videoHeight > maxHeight) {
-          const ratio = Math.min(maxWidth / videoWidth, maxHeight / videoHeight);
-          videoWidth = videoWidth * ratio;
-          videoHeight = videoHeight * ratio;
-        }
-        
-        canvas.width = videoWidth;
-        canvas.height = videoHeight;
-        context.drawImage(video, 0, 0, videoWidth, videoHeight);
-        
-        // Use lower quality to reduce file size
-        const imageData = canvas.toDataURL('image/jpeg', 0.7);
+        // Set canvas size to match video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        // Draw video frame to canvas
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convert to base64 image
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
         setCapturedImage(imageData);
-        stopCamera();
+        console.log('📸 Image captured');
       }
     }
   };
 
   const retakePhoto = () => {
     setCapturedImage(null);
-    startCamera();
   };
 
   const confirmImage = () => {
@@ -199,13 +186,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
     stopCamera();
     onClose();
   };
-
-  useEffect(() => {
-    startCamera();
-    return () => {
-      stopCamera();
-    };
-  }, [startCamera, stopCamera]);
 
   return (
     <div style={{
@@ -225,271 +205,238 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
         backgroundColor: 'white',
         borderRadius: '16px',
         padding: '24px',
-        maxWidth: '400px',
+        maxWidth: '500px',
         width: '100%',
         maxHeight: '90vh',
         overflow: 'hidden',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         animation: 'slideDown 0.3s ease-out'
       }}>
+        {/* Header */}
         <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
+          justifyContent: 'space-between',
           marginBottom: '20px'
         }}>
-          <h3 style={{
-            fontSize: '18px',
-            fontWeight: '600',
-            color: '#1f2937',
-            margin: 0
-          }}>📸 Food Camera</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Camera size={20} color="#3b82f6" />
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Food Camera</h3>
+          </div>
           <button
             onClick={cancelCapture}
             style={{
               background: 'none',
               border: 'none',
-              color: '#6b7280',
               cursor: 'pointer',
               padding: '4px',
-              borderRadius: '6px',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
-              e.currentTarget.style.color = '#374151';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = '#6b7280';
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
-            <X size={20} />
+            <X size={20} color="#6b7280" />
           </button>
         </div>
 
-        {error && (
-          <div style={{
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#dc2626',
-            padding: '16px',
-            borderRadius: '8px',
-            marginBottom: '16px',
-            fontSize: '14px',
-            textAlign: 'center'
-          }}>
-            <div style={{ marginBottom: '8px' }}>⚠️ Camera not available</div>
-            <div style={{ fontSize: '12px', opacity: 0.8 }}>Please use text input to describe your food</div>
-          </div>
-        )}
-
-        <div style={{ position: 'relative' }}>
-          {capturedImage ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Camera Content */}
+        <div style={{ marginBottom: '20px' }}>
+          {error ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '300px',
+              textAlign: 'center',
+              padding: '20px'
+            }}>
+              <div style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                backgroundColor: '#fef2f2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px'
+              }}>
+                <span style={{ fontSize: '24px' }}>⚠️</span>
+              </div>
+              <h4 style={{ margin: '0 0 8px 0', color: '#dc2626' }}>Camera Error</h4>
+              <p style={{ margin: '0 0 16px 0', color: '#6b7280', fontSize: '14px' }}>{error}</p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  setIsLoading(true);
+                  startCamera();
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  marginBottom: '8px'
+                }}
+              >
+                🔄 Try Again
+              </button>
+              <button
+                onClick={onClose}
+                style={{
+                  background: 'transparent',
+                  color: '#6b7280',
+                  border: '1px solid #d1d5db',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                📝 Use Text Input Instead
+              </button>
+            </div>
+          ) : capturedImage ? (
+            <div style={{ textAlign: 'center' }}>
               <img
                 src={capturedImage}
                 alt="Captured food"
                 style={{
                   width: '100%',
-                  height: '200px',
+                  maxHeight: '300px',
                   objectFit: 'cover',
-                  borderRadius: '12px',
-                  border: '2px solid #e5e7eb'
+                  borderRadius: '8px',
+                  marginBottom: '16px'
                 }}
               />
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                 <button
                   onClick={retakePhoto}
                   style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '12px 16px',
-                    border: '2px solid #d1d5db',
-                    borderRadius: '10px',
-                    backgroundColor: 'white',
-                    color: '#374151',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
+                    background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
                     fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f9fafb';
-                    e.currentTarget.style.borderColor = '#9ca3af';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white';
-                    e.currentTarget.style.borderColor = '#d1d5db';
+                    fontWeight: '600',
+                    cursor: 'pointer'
                   }}
                 >
-                  <RotateCcw size={16} style={{ marginRight: '8px' }} />
-                  Retake
+                  📷 Retake
                 </button>
                 <button
                   onClick={confirmImage}
                   style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '12px 16px',
-                    backgroundColor: '#10b981',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '10px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
                     fontSize: '14px',
                     fontWeight: '600',
-                    boxShadow: '0 4px 14px 0 rgba(16, 185, 129, 0.3)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#059669';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 6px 20px 0 rgba(16, 185, 129, 0.4)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#10b981';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(16, 185, 129, 0.3)';
+                    cursor: 'pointer'
                   }}
                 >
-                  <Check size={16} style={{ marginRight: '8px' }} />
-                  Use Photo
+                  ✅ Use This Photo
                 </button>
               </div>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          ) : isLoading ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '300px',
+              textAlign: 'center'
+            }}>
               <div style={{
-                position: 'relative',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                height: '200px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                {isLoading ? (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    color: '#6b7280'
-                  }}>
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      border: '3px solid #e5e7eb',
-                      borderTop: '3px solid #3b82f6',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite',
-                      marginBottom: '12px'
-                    }}></div>
-                    <p style={{ margin: '0', fontSize: '14px' }}>Starting camera...</p>
-                  </div>
-                ) : stream ? (
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    onClick={captureImage}
-                    onLoadStart={() => console.log('📹 Video load started')}
-                    onCanPlay={() => console.log('📹 Video can play')}
-                    onLoadedData={() => console.log('📹 Video data loaded')}
-                    onError={(e) => console.log('📹 Video error:', e)}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      cursor: 'pointer',
-                      backgroundColor: '#000' // Add background to see if video is there
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: '100%',
-                    height: '200px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#f3f4f6',
-                    borderRadius: '8px',
-                    border: '2px dashed #d1d5db',
-                    color: '#6b7280',
-                    fontSize: '14px',
-                    textAlign: 'center',
-                    padding: '20px'
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '24px', marginBottom: '8px' }}>📷</div>
-                      <div>Camera not available</div>
-                      <div style={{ fontSize: '12px', marginTop: '4px' }}>
-                        Please use text input instead
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <canvas
-                  ref={canvasRef}
-                  style={{ display: 'none' }}
-                />
+                width: '40px',
+                height: '40px',
+                border: '3px solid #e5e7eb',
+                borderTop: '3px solid #3b82f6',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                marginBottom: '16px'
+              }}></div>
+              <p style={{ margin: '0', fontSize: '16px', color: '#374151' }}>Starting camera...</p>
+              <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: '#6b7280' }}>
+                Please allow camera access when prompted
+              </p>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center' }}>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  width: '100%',
+                  maxHeight: '300px',
+                  objectFit: 'cover',
+                  borderRadius: '8px',
+                  backgroundColor: '#000'
+                }}
+              />
+              <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#6b7280' }}>
+                Point your camera at food and click to capture
+              </p>
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af' }}>
+                Debug: Stream={stream ? '✅' : '❌'} Video={videoRef.current ? '✅' : '❌'}
               </div>
-              
-              <div style={{ textAlign: 'center' }}>
-                {stream ? (
-                  <div style={{ 
-                    color: '#10b981', 
-                    fontSize: '14px', 
-                    fontWeight: '500',
-                    textAlign: 'center',
-                    padding: '20px'
-                  }}>
-                    📷 Camera ready - Click anywhere to capture
-                  </div>
-                ) : (
-                  <div style={{ 
-                    color: '#6b7280', 
-                    fontSize: '14px',
-                    textAlign: 'center',
-                    padding: '20px'
-                  }}>
-                    📝 Camera not available - Please use text input
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={captureImage}
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '25px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  marginTop: '16px',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                }}
+              >
+                📸 Capture Food
+              </button>
             </div>
           )}
         </div>
 
-        <div style={{
-          marginTop: '16px',
-          fontSize: '13px',
-          color: '#6b7280',
-          textAlign: 'center',
-          lineHeight: '1.4'
-        }}>
-          {capturedImage 
-            ? "✨ Review your photo and confirm to analyze with AI"
-            : "📱 Point your camera at the food and tap capture"
-          }
-        </div>
+        {/* Hidden canvas for image capture */}
+        <canvas
+          ref={canvasRef}
+          style={{ display: 'none' }}
+        />
       </div>
 
       <style>{`
         @keyframes slideDown {
           from {
             opacity: 0;
-            transform: translateY(-20px) scale(0.95);
+            transform: translateY(-20px);
           }
           to {
             opacity: 1;
-            transform: translateY(0) scale(1);
+            transform: translateY(0);
           }
         }
         
