@@ -372,35 +372,33 @@ async function recognizeFoodWithAI(foodDescription) {
           role: "system",
           content: `You are a nutrition expert specializing in all cuisines worldwide. Analyze food descriptions and provide accurate nutritional information for any cuisine (Indian, Chinese, Italian, Mexican, Middle Eastern, Thai, Japanese, Korean, etc.).
 
-For complex meals with multiple components (e.g., "100 gram of rice with 1 chicken breast", "pizza slice with coke"), you must:
-1. Identify all individual food items and their estimated quantities.
-2. Calculate the **total calories, protein, carbs, and fat for the ENTIRE COMBINED MEAL**.
-3. Determine the **total estimated quantity of the combined meal in grams**.
-4. Then, calculate the **average nutritional values per 100g of the combined meal** based on these totals.
+CRITICAL: When you see multiple food items in a description (like "100 gm chicken breast with 100 gm rice"), you MUST:
+1. Identify ALL food items mentioned and their quantities
+2. Calculate nutrition for EACH item separately
+3. Add up the total calories, protein, carbs, and fat for the ENTIRE meal
+4. Calculate the total weight of the combined meal
+5. Then provide per-100g values for the COMBINED meal
 
 Return ONLY a JSON object with this structure:
 {
-  "name": "food name (e.g., 'Rice with Chicken Breast')",
-  "calories_per_100g": [average calories per 100g of the combined meal],
-  "protein_per_100g": [average protein per 100g of the combined meal],
-  "carbs_per_100g": [average carbs per 100g of the combined meal],
-  "fat_per_100g": [average fat per 100g of the combined meal],
-  "estimated_quantity": [total estimated quantity of the combined meal in grams],
+  "name": "Combined meal name (e.g., 'Chicken Breast with Rice')",
+  "calories_per_100g": [total calories of entire meal ÷ total weight × 100],
+  "protein_per_100g": [total protein of entire meal ÷ total weight × 100],
+  "carbs_per_100g": [total carbs of entire meal ÷ total weight × 100],
+  "fat_per_100g": [total fat of entire meal ÷ total weight × 100],
+  "estimated_quantity": [total weight of entire meal in grams],
   "unit": "g",
   "confidence": 0.9
 }
 
-Be specific about the food and provide realistic nutritional values based on the actual cuisine and ingredients.
+EXAMPLE CALCULATION for "100 gm chicken breast with 100 gm rice":
+- Chicken breast (100g): ~165 cal, 31g protein, 0g carbs, 3.6g fat
+- Rice (100g): ~130 cal, 2.7g protein, 28g carbs, 0.3g fat
+- TOTAL: 295 cal, 33.7g protein, 28g carbs, 3.9g fat for 200g
+- Per 100g: 147.5 cal, 16.85g protein, 14g carbs, 1.95g fat
+- estimated_quantity: 200
 
-Example for "100 gram of rice with 1 chicken breast":
-- Assume 1 chicken breast is ~150g.
-- Total estimated quantity of the meal: 100g (rice) + 150g (chicken) = 250g.
-- Calculate total calories, protein, carbs, fat for 250g.
-- Then, divide these totals by 2.5 to get the average per 100g.
-
-Example for "pizza with coke":
-- Pizza slice (~100g) + Coke (330ml can) = ~430g total.
-- Calculate combined nutrition and divide by 4.3 for per-100g values.`
+ALWAYS include ALL mentioned food items in your calculation!`
         },
         {
           role: "user",
@@ -411,6 +409,7 @@ Example for "pizza with coke":
     });
 
     const aiResponse = response.choices[0].message.content;
+    console.log('AI Response for food description:', foodDescription);
     console.log('AI Response:', aiResponse);
 
     try {
