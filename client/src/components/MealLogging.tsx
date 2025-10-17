@@ -90,12 +90,25 @@ const MealLogging: React.FC = () => {
         foodDescription: aiInput
       });
       
-      // Convert single food result to array format to match image recognition
-      const recognizedFood = response.data;
-      setAiResult([recognizedFood]);
+      // Handle both single food and multiple components format
+      const responseData = response.data;
+      
+      if (responseData.hasMultipleComponents && responseData.allComponents) {
+        // New structured format with individual components
+        setAiResult(responseData.allComponents);
+        setMessage(`AI recognized ${responseData.allComponents.length} components: ${responseData.allComponents.map((item: any) => item.name).join(', ')}`);
+      } else if (Array.isArray(responseData)) {
+        // Already an array format
+        setAiResult(responseData);
+        setMessage(`AI recognized ${responseData.length} items: ${responseData.map((item: any) => item.name).join(', ')}`);
+      } else {
+        // Single food result - convert to array format
+        setAiResult([responseData]);
+        setMessage(`AI recognized: ${responseData.name}`);
+      }
+      
       setSelectedAiItems(new Set()); // Clear previous selections
       setShowAiSection(true);
-      setMessage(`AI recognized: ${recognizedFood.name}`);
     } catch (error: any) {
       setMessage('AI recognition failed: ' + (error.response?.data?.error || error.message));
     } finally {
@@ -107,23 +120,41 @@ const MealLogging: React.FC = () => {
     if (aiResult && Array.isArray(aiResult) && aiResult[foodIndex]) {
       const selectedFoodItem = aiResult[foodIndex];
       
-      // Convert AI scaled values back to per-100g values for consistent frontend calculation
-      const quantity = selectedFoodItem.quantity || 100;
-      const scaleFactor = quantity / 100;
-      
-      setSelectedFood({
-        id: 'ai-' + Date.now() + '-' + foodIndex,
-        name: selectedFoodItem.name,
-        calories_per_100g: selectedFoodItem.calories / scaleFactor,
-        protein_per_100g: selectedFoodItem.protein / scaleFactor,
-        carbs_per_100g: selectedFoodItem.carbs / scaleFactor,
-        fat_per_100g: selectedFoodItem.fat / scaleFactor,
-        category: 'AI Recognized'
-      });
-      
-      // Preserve the AI-detected quantity and unit (don't reset to 100g)
-      setQuantity(selectedFoodItem.quantity ? selectedFoodItem.quantity.toString() : '100');
-      setUnit(selectedFoodItem.unit || 'g');
+      // Handle both old format (with calories, protein, etc.) and new format (with calories_per_100g, etc.)
+      if (selectedFoodItem.calories_per_100g !== undefined) {
+        // New format - already has per-100g values
+        setSelectedFood({
+          id: 'ai-' + Date.now() + '-' + foodIndex,
+          name: selectedFoodItem.name,
+          calories_per_100g: selectedFoodItem.calories_per_100g,
+          protein_per_100g: selectedFoodItem.protein_per_100g,
+          carbs_per_100g: selectedFoodItem.carbs_per_100g,
+          fat_per_100g: selectedFoodItem.fat_per_100g,
+          category: 'AI Recognized'
+        });
+        
+        // Preserve the AI-detected quantity and unit
+        setQuantity(selectedFoodItem.quantity ? selectedFoodItem.quantity.toString() : '100');
+        setUnit(selectedFoodItem.unit || 'g');
+      } else {
+        // Old format - convert scaled values back to per-100g values
+        const quantity = selectedFoodItem.quantity || 100;
+        const scaleFactor = quantity / 100;
+        
+        setSelectedFood({
+          id: 'ai-' + Date.now() + '-' + foodIndex,
+          name: selectedFoodItem.name,
+          calories_per_100g: selectedFoodItem.calories / scaleFactor,
+          protein_per_100g: selectedFoodItem.protein / scaleFactor,
+          carbs_per_100g: selectedFoodItem.carbs / scaleFactor,
+          fat_per_100g: selectedFoodItem.fat / scaleFactor,
+          category: 'AI Recognized'
+        });
+        
+        // Preserve the AI-detected quantity and unit
+        setQuantity(selectedFoodItem.quantity ? selectedFoodItem.quantity.toString() : '100');
+        setUnit(selectedFoodItem.unit || 'g');
+      }
       
       // Mark this item as selected
       setSelectedAiItems(prev => new Set([...Array.from(prev), foodIndex]));
