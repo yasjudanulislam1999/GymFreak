@@ -1428,21 +1428,23 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
     if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
       console.error('OpenAI API key not configured - returning mock response');
       
-      // Return a mock response for testing
+      // Return a mock response for testing with new format
       const mockFoods = [
-        { name: 'Grilled Chicken Breast', calories: 165, protein: 31, carbs: 0, fat: 3.6, quantity: 150, unit: 'g', confidence: 85 },
-        { name: 'White Rice', calories: 130, protein: 2.7, carbs: 28, fat: 0.3, quantity: 100, unit: 'g', confidence: 90 },
-        { name: 'Apple', calories: 52, protein: 0.3, carbs: 14, fat: 0.2, quantity: 1, unit: 'piece', confidence: 95 },
-        { name: 'Banana', calories: 89, protein: 1.1, carbs: 23, fat: 0.3, quantity: 1, unit: 'piece', confidence: 92 },
-        { name: 'Bread Slice', calories: 80, protein: 3, carbs: 15, fat: 1, quantity: 1, unit: 'slice', confidence: 88 }
+        { name: 'Grilled Chicken Breast', calories_per_100g: 165, protein_per_100g: 31, carbs_per_100g: 0, fat_per_100g: 3.6, quantity: 150, unit: 'g', confidence: 85 },
+        { name: 'White Rice', calories_per_100g: 130, protein_per_100g: 2.7, carbs_per_100g: 28, fat_per_100g: 0.3, quantity: 100, unit: 'g', confidence: 90 },
+        { name: 'Apple', calories_per_100g: 52, protein_per_100g: 0.3, carbs_per_100g: 14, fat_per_100g: 0.2, quantity: 1, unit: 'piece', confidence: 95 },
+        { name: 'Banana', calories_per_100g: 89, protein_per_100g: 1.1, carbs_per_100g: 23, fat_per_100g: 0.3, quantity: 1, unit: 'piece', confidence: 92 },
+        { name: 'Bread Slice', calories_per_100g: 80, protein_per_100g: 3, carbs_per_100g: 15, fat_per_100g: 1, quantity: 1, unit: 'slice', confidence: 88 }
       ];
       
       const randomFood = mockFoods[Math.floor(Math.random() * mockFoods.length)];
       
       return res.json({
         foods: [{
+          id: `mock-${Date.now()}`,
           ...randomFood,
-          source: 'Mock AI Recognition (API Key Not Configured)'
+          source: 'Mock AI Recognition (API Key Not Configured)',
+          isAIResult: true
         }]
       });
     }
@@ -1460,7 +1462,51 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
           content: [
             {
               type: "text",
-              text: "Analyze this food image and identify ALL food items visible. For each food item, provide nutritional information. If multiple items are visible together (like a complete meal), you can either: 1) List each item separately, or 2) Create a combined meal entry. For combined meals, calculate the total nutrition of all visible items and provide per-100g values for the entire combined meal. Return ONLY a JSON object with this structure: {\"foods\": [{\"name\": \"item1\", \"calories_per_100g\": 100, \"protein_per_100g\": 10, \"carbs_per_100g\": 15, \"fat_per_100g\": 5, \"estimated_quantity\": 150, \"unit\": \"g\", \"confidence\": 0.9}, {\"name\": \"item2\", ...}]}. If it's a single item, still use the foods array with one object. Be specific about each food item and provide realistic nutritional values. Do not include any other text."
+              text: `You are a registered nutritionist and dietitian analyzing food images. Your job is to identify ALL food items visible and provide accurate nutritional information.
+
+CRITICAL BEHAVIOUR
+- Always detect MULTIPLE items visible in the image
+- Normalise quantities to grams (g) with realistic estimates
+- Adjust for cooking method and typical additions (oil, sauces, skin)
+- Be cuisine-aware and map items to canonical names
+- Output ONLY JSON. No text outside JSON.
+
+OUTPUT SCHEMA (STRICT)
+{
+  "foods": [
+    {
+      "name": "canonical food name with method (e.g., 'fried eggs', 'grilled chicken breast')",
+      "calories_per_100g": 150,
+      "protein_per_100g": 10,
+      "carbs_per_100g": 15,
+      "fat_per_100g": 5,
+      "estimated_quantity": 150,
+      "unit": "g",
+      "confidence": 0.9
+    }
+  ]
+}
+
+DEFAULT CONVERSIONS (use when quantities are not clear)
+- 1 egg (large): 50g
+- 1 chicken breast (medium): 120g
+- 1 cup cooked rice: 150g
+- 1 slice bread: 30g
+- 1 apple (medium): 150g
+- 1 banana (medium): 120g
+- 1 roti/chapati: 40g
+
+COOKING-METHOD ADJUSTMENTS
+- Fried: add 1 tbsp (14g) oil per 100g food
+- Grilled/boiled: no added oil
+- Scrambled eggs: add 1 tsp (5g) butter/oil
+
+QUALITY RULES
+- Keep numbers realistic and internally consistent
+- If you cannot identify a component clearly, estimate conservatively
+- Provide confidence scores based on clarity of identification
+
+Return ONLY the JSON object with the foods array.`
             },
             {
               type: "image_url",
@@ -1472,7 +1518,7 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
           ]
         }
       ],
-      max_tokens: 300
+      max_tokens: 500
     });
 
     const aiResponse = response.choices[0].message.content;
@@ -1494,29 +1540,33 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
       let foods = [];
       if (foodData.foods && Array.isArray(foodData.foods)) {
         // Multiple foods format
-        foods = foodData.foods.map(food => ({
+        foods = foodData.foods.map((food, index) => ({
+          id: `ai-vision-${Date.now()}-${index}`,
           name: food.name || 'Unknown Food',
-          calories: Math.round(food.calories_per_100g || 0),
-          protein: Math.round((food.protein_per_100g || 0) * 10) / 10,
-          carbs: Math.round((food.carbs_per_100g || 0) * 10) / 10,
-          fat: Math.round((food.fat_per_100g || 0) * 10) / 10,
+          calories_per_100g: Math.round(food.calories_per_100g || 0),
+          protein_per_100g: Math.round((food.protein_per_100g || 0) * 10) / 10,
+          carbs_per_100g: Math.round((food.carbs_per_100g || 0) * 10) / 10,
+          fat_per_100g: Math.round((food.fat_per_100g || 0) * 10) / 10,
           quantity: food.estimated_quantity || 100,
           unit: food.unit || 'g',
           confidence: Math.round((food.confidence || 0.5) * 100),
-          source: 'AI Vision Recognition'
+          source: 'AI Vision Recognition',
+          isAIResult: true
         }));
       } else {
         // Single food format (fallback)
         foods = [{
+          id: `ai-vision-${Date.now()}-0`,
           name: foodData.name || 'Unknown Food',
-          calories: Math.round(foodData.calories_per_100g || 0),
-          protein: Math.round((foodData.protein_per_100g || 0) * 10) / 10,
-          carbs: Math.round((foodData.carbs_per_100g || 0) * 10) / 10,
-          fat: Math.round((foodData.fat_per_100g || 0) * 10) / 10,
+          calories_per_100g: Math.round(foodData.calories_per_100g || 0),
+          protein_per_100g: Math.round((foodData.protein_per_100g || 0) * 10) / 10,
+          carbs_per_100g: Math.round((foodData.carbs_per_100g || 0) * 10) / 10,
+          fat_per_100g: Math.round((foodData.fat_per_100g || 0) * 10) / 10,
           quantity: foodData.estimated_quantity || 100,
           unit: foodData.unit || 'g',
           confidence: Math.round((foodData.confidence || 0.5) * 100),
-          source: 'AI Vision Recognition'
+          source: 'AI Vision Recognition (Fallback)',
+          isAIResult: true
         }];
       }
 
@@ -1533,18 +1583,20 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
       else if (aiResponse.toLowerCase().includes('banana')) foodName = 'Banana';
       else if (aiResponse.toLowerCase().includes('bread')) foodName = 'Bread';
       
-      // Fallback response
+      // Fallback response with new format
       res.json({
         foods: [{
+          id: `fallback-${Date.now()}`,
           name: foodName,
-          calories: 150,
-          protein: 10,
-          carbs: 20,
-          fat: 5,
+          calories_per_100g: 150,
+          protein_per_100g: 10,
+          carbs_per_100g: 20,
+          fat_per_100g: 5,
           quantity: 100,
           unit: 'g',
           confidence: 50,
-          source: 'AI Vision Recognition (Fallback)'
+          source: 'AI Vision Recognition (Fallback)',
+          isAIResult: true
         }]
       });
     }
