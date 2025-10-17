@@ -477,7 +477,7 @@ OUTPUT:
           content: `Analyze this food description and provide accurate nutritional information: "${foodDescription}"`
         }
       ],
-      max_tokens: 300
+      max_tokens: 500
     });
 
     const aiResponse = response.choices[0].message.content;
@@ -493,10 +493,62 @@ OUTPUT:
         cleanResponse = cleanResponse.split('```')[1].split('```')[0];
       }
 
+      // Handle incomplete JSON responses
+      if (cleanResponse.includes('"cal') && !cleanResponse.includes('"calories_per_100g"')) {
+        console.log('Detected incomplete JSON, attempting to fix...');
+        cleanResponse = cleanResponse.replace(/"cal\s*$/, '"calories_per_100g": 0');
+        cleanResponse = cleanResponse.replace(/"protein_per_100g":\s*$/, '"protein_per_100g": 0');
+        cleanResponse = cleanResponse.replace(/"carbs_per_100g":\s*$/, '"carbs_per_100g": 0');
+        cleanResponse = cleanResponse.replace(/"fat_per_100g":\s*$/, '"fat_per_100g": 0');
+        cleanResponse = cleanResponse.replace(/"estimated_quantity":\s*$/, '"estimated_quantity": 100');
+        cleanResponse = cleanResponse.replace(/"unit":\s*$/, '"unit": "g"');
+        cleanResponse = cleanResponse.replace(/"confidence":\s*$/, '"confidence": 0.8');
+        
+        // Try to close any incomplete objects
+        if (cleanResponse.includes('"backcompat": {') && !cleanResponse.includes('}')) {
+          cleanResponse = cleanResponse.replace(/"backcompat":\s*{\s*$/, '"backcompat": {"name": "combined meal", "calories_per_100g": 0, "protein_per_100g": 0, "carbs_per_100g": 0, "fat_per_100g": 0, "estimated_quantity": 100, "unit": "g", "confidence": 0.8}');
+        }
+        
+        // Close any incomplete JSON
+        if (!cleanResponse.endsWith('}')) {
+          cleanResponse = cleanResponse.replace(/,\s*$/, '') + '}';
+        }
+      }
+
       const foodData = JSON.parse(cleanResponse);
       console.log('Parsed food data:', foodData);
 
-      // Check if we have the new structured format with backcompat
+      // Check if we have the new structured format with individual items
+      if (foodData.items && Array.isArray(foodData.items)) {
+        console.log('Using structured AI response with individual items');
+        
+        // Return individual components for separate logging
+        const individualItems = foodData.items.map((item, index) => ({
+          id: `ai-item-${Date.now()}-${index}`,
+          name: item.name,
+          calories_per_100g: Math.round((item.calories / item.quantity_g) * 100),
+          protein_per_100g: Math.round((item.protein_g / item.quantity_g) * 100 * 10) / 10,
+          carbs_per_100g: Math.round((item.carbs_g / item.quantity_g) * 100 * 10) / 10,
+          fat_per_100g: Math.round((item.fat_g / item.quantity_g) * 100 * 10) / 10,
+          quantity: item.quantity_g,
+          unit: 'g',
+          confidence: Math.round((item.confidence || 0.5) * 100),
+          source: 'OpenAI Structured Recognition',
+          assumptions: item.assumptions || [],
+          isAIResult: true
+        }));
+
+        // Return the first item for backward compatibility, but mark it as having multiple components
+        return {
+          ...individualItems[0],
+          hasMultipleComponents: true,
+          allComponents: individualItems,
+          totalWeight: foodData.totals?.weight_g || individualItems.reduce((sum, item) => sum + item.quantity, 0),
+          totalCalories: foodData.totals?.calories || individualItems.reduce((sum, item) => sum + (item.calories_per_100g * item.quantity / 100), 0)
+        };
+      }
+
+      // Check if we have the new structured format with backcompat (fallback)
       if (foodData.backcompat) {
         console.log('Using structured AI response with backcompat data');
         return {

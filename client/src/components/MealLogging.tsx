@@ -46,6 +46,8 @@ const MealLogging: React.FC = () => {
   const [aiResult, setAiResult] = useState<any>(null);
   const [showAiSection, setShowAiSection] = useState(true);
   const [selectedAiItems, setSelectedAiItems] = useState<Set<number>>(new Set());
+  const [itemQuantities, setItemQuantities] = useState<{[key: number]: string}>({});
+  const [itemUnits, setItemUnits] = useState<{[key: number]: string}>({});
   
   // Camera states
   const [showCamera, setShowCamera] = useState(false);
@@ -427,7 +429,7 @@ const MealLogging: React.FC = () => {
                 </button>
               </div>
               <p style={{ margin: '0 0 16px 0', fontSize: '14px', opacity: 0.9 }}>
-                Found {aiResult.length} food item{aiResult.length > 1 ? 's' : ''}. Click on any item to use it:
+                Found {aiResult.length} food item{aiResult.length > 1 ? 's' : ''}. Edit quantities and log each item separately:
                 {selectedAiItems.size > 0 && (
                   <span style={{ color: '#10b981', fontWeight: '600' }}>
                     {' '}({selectedAiItems.size} selected)
@@ -437,62 +439,184 @@ const MealLogging: React.FC = () => {
                   
                   {aiResult.map((food, index) => {
                     const isSelected = selectedAiItems.has(index);
+                    const itemQuantity = itemQuantities[index] || food.quantity?.toString() || '100';
+                    const itemUnit = itemUnits[index] || food.unit || 'g';
+                    
+                    // Calculate nutrition based on current quantity
+                    const quantityNum = parseFloat(itemQuantity) || 0;
+                    let multiplier = 1;
+                    switch (itemUnit) {
+                      case 'kg':
+                        multiplier = quantityNum * 10;
+                        break;
+                      case 'g':
+                      default:
+                        multiplier = quantityNum / 100;
+                        break;
+                    }
+                    
+                    const calculatedCalories = Math.round(food.calories_per_100g * multiplier);
+                    const calculatedProtein = Math.round(food.protein_per_100g * multiplier * 10) / 10;
+                    const calculatedCarbs = Math.round(food.carbs_per_100g * multiplier * 10) / 10;
+                    const calculatedFat = Math.round(food.fat_per_100g * multiplier * 10) / 10;
+                    
                     return (
                       <div key={index} style={{ 
-                        marginBottom: '12px', 
-                        padding: '12px', 
+                        marginBottom: '16px', 
+                        padding: '16px', 
                         background: isSelected ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.05)', 
-                        borderRadius: '6px',
+                        borderRadius: '8px',
                         border: isSelected ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255,255,255,0.1)',
-                        cursor: 'pointer',
                         transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) {
-                          (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.1)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
-                        }
-                      }}
-                      onClick={() => handleFoodItemClick(index)}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <h5 style={{ margin: 0, color: '#fff' }}>{food.name}</h5>
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <h5 style={{ margin: 0, color: '#fff', fontSize: '16px' }}>{food.name}</h5>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {isSelected && (
-                              <span style={{ 
-                                background: 'rgba(16, 185, 129, 0.2)', 
-                                color: '#10b981',
-                                padding: '2px 6px', 
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: '600'
-                              }}>
-                                ✓ Selected
-                              </span>
-                            )}
                             <span style={{ fontSize: '12px', opacity: 0.8 }}>{food.confidence}% confidence</span>
                           </div>
                         </div>
-                        <div className="grid grid-3" style={{ fontSize: '12px', opacity: 0.9 }}>
-                          <div><strong>Quantity:</strong> {food.quantity} {food.unit}</div>
-                          <div><strong>Calories:</strong> {food.calories} cal</div>
-                          <div><strong>Protein:</strong> {food.protein}g</div>
-                          <div><strong>Carbs:</strong> {food.carbs}g</div>
-                          <div><strong>Fat:</strong> {food.fat}g</div>
-                          <div style={{ textAlign: 'right' }}>
-                            <span style={{ 
-                              background: isSelected ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.2)', 
-                              color: isSelected ? '#10b981' : '#fff',
-                              padding: '4px 8px', 
-                              borderRadius: '4px',
-                              fontSize: '11px'
-                            }}>
-                              {isSelected ? '✓ Selected' : 'Click to use'}
-                            </span>
+                        
+                        {/* Quantity Input */}
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '12px', opacity: 0.8, display: 'block', marginBottom: '4px' }}>Quantity:</label>
+                            <input
+                              type="number"
+                              value={itemQuantity}
+                              onChange={(e) => setItemQuantities(prev => ({...prev, [index]: e.target.value}))}
+                              style={{
+                                width: '100%',
+                                padding: '8px',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                background: 'rgba(255,255,255,0.1)',
+                                color: '#fff',
+                                fontSize: '14px'
+                              }}
+                              placeholder="100"
+                            />
                           </div>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '12px', opacity: 0.8, display: 'block', marginBottom: '4px' }}>Unit:</label>
+                            <select
+                              value={itemUnit}
+                              onChange={(e) => setItemUnits(prev => ({...prev, [index]: e.target.value}))}
+                              style={{
+                                width: '100%',
+                                padding: '8px',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                background: 'rgba(255,255,255,0.1)',
+                                color: '#fff',
+                                fontSize: '14px'
+                              }}
+                            >
+                              <option value="g">g</option>
+                              <option value="kg">kg</option>
+                            </select>
+                          </div>
+                        </div>
+                        
+                        {/* Nutrition Display */}
+                        <div className="grid grid-2" style={{ fontSize: '12px', opacity: 0.9, marginBottom: '12px' }}>
+                          <div><strong>Calories:</strong> {calculatedCalories} cal</div>
+                          <div><strong>Protein:</strong> {calculatedProtein}g</div>
+                          <div><strong>Carbs:</strong> {calculatedCarbs}g</div>
+                          <div><strong>Fat:</strong> {calculatedFat}g</div>
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => {
+                              const updatedFood = {
+                                ...food,
+                                quantity: quantityNum,
+                                unit: itemUnit,
+                                calories_per_100g: food.calories_per_100g,
+                                protein_per_100g: food.protein_per_100g,
+                                carbs_per_100g: food.carbs_per_100g,
+                                fat_per_100g: food.fat_per_100g
+                              };
+                              setSelectedFood(updatedFood);
+                              setQuantity(quantityNum.toString());
+                              setUnit(itemUnit);
+                              setSelectedAiItems(prev => new Set([...Array.from(prev), index]));
+                            }}
+                            style={{
+                              flex: 1,
+                              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                              color: 'white',
+                              border: 'none',
+                              padding: '10px 16px',
+                              borderRadius: '6px',
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          >
+                            Use This Item
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                setLoading(true);
+                                const mealData = {
+                                  name: food.name,
+                                  calories: calculatedCalories,
+                                  protein: calculatedProtein,
+                                  carbs: calculatedCarbs,
+                                  fat: calculatedFat,
+                                  quantity: quantityNum,
+                                  unit: itemUnit,
+                                  mealType: mealType,
+                                  date: new Date().toISOString().split('T')[0]
+                                };
+                                await axios.post('/api/meals', mealData);
+                                setMessage(`${food.name} logged successfully!`);
+                                fetchMeals();
+                              } catch (error: any) {
+                                setMessage('Error logging meal: ' + (error.response?.data?.error || error.message));
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            disabled={loading}
+                            style={{
+                              flex: 1,
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              color: 'white',
+                              border: 'none',
+                              padding: '10px 16px',
+                              borderRadius: '6px',
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              cursor: loading ? 'not-allowed' : 'pointer',
+                              opacity: loading ? 0.6 : 1,
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!loading) {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          >
+                            {loading ? 'Logging...' : 'Log This Item'}
+                          </button>
                         </div>
                       </div>
                     );
