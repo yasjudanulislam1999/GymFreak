@@ -133,9 +133,11 @@ const MealLogging: React.FC = () => {
           category: 'AI Recognized'
         });
         
-        // Preserve the AI-detected quantity and unit
-        setQuantity(selectedFoodItem.quantity ? selectedFoodItem.quantity.toString() : '100');
-        setUnit(selectedFoodItem.unit || 'g');
+        // Use smart unit selection and appropriate default quantity
+        const suggestedUnit = getBestUnitForFood(selectedFoodItem.name);
+        const defaultQuantity = suggestedUnit === 'piece' ? '2' : (selectedFoodItem.quantity ? selectedFoodItem.quantity.toString() : '100');
+        setQuantity(defaultQuantity);
+        setUnit(suggestedUnit);
       } else {
         // Old format - convert scaled values back to per-100g values
         const quantity = selectedFoodItem.quantity || 100;
@@ -151,9 +153,11 @@ const MealLogging: React.FC = () => {
           category: 'AI Recognized'
         });
         
-        // Preserve the AI-detected quantity and unit
-        setQuantity(selectedFoodItem.quantity ? selectedFoodItem.quantity.toString() : '100');
-        setUnit(selectedFoodItem.unit || 'g');
+        // Use smart unit selection and appropriate default quantity
+        const suggestedUnit = getBestUnitForFood(selectedFoodItem.name);
+        const defaultQuantity = suggestedUnit === 'piece' ? '2' : (selectedFoodItem.quantity ? selectedFoodItem.quantity.toString() : '100');
+        setQuantity(defaultQuantity);
+        setUnit(suggestedUnit);
       }
       
       // Mark this item as selected
@@ -169,6 +173,34 @@ const MealLogging: React.FC = () => {
     setAiResult(null);
     setSelectedAiItems(new Set());
     setAiInput('');
+  };
+
+  // Function to determine the best unit for a food item
+  const getBestUnitForFood = (foodName: string) => {
+    const lowerName = foodName.toLowerCase();
+    
+    // Countable items
+    if (lowerName.includes('egg') || lowerName.includes('chicken breast') || 
+        lowerName.includes('apple') || lowerName.includes('banana') || 
+        lowerName.includes('bread') || lowerName.includes('slice') ||
+        lowerName.includes('roti') || lowerName.includes('chapati') ||
+        lowerName.includes('naan') || lowerName.includes('tortilla')) {
+      return 'piece';
+    }
+    
+    // Items typically measured by slices
+    if (lowerName.includes('bread') && !lowerName.includes('slice')) {
+      return 'slice';
+    }
+    
+    // Items typically measured by cups
+    if (lowerName.includes('rice') || lowerName.includes('pasta') || 
+        lowerName.includes('cereal') || lowerName.includes('oats')) {
+      return 'cup';
+    }
+    
+    // Default to grams for everything else
+    return 'g';
   };
 
   const recognizeImageWithAI = async (imageData: string) => {
@@ -470,18 +502,49 @@ const MealLogging: React.FC = () => {
                   
                   {aiResult.map((food, index) => {
                     const isSelected = selectedAiItems.has(index);
-                    const itemQuantity = itemQuantities[index] || food.quantity?.toString() || '100';
-                    const itemUnit = itemUnits[index] || food.unit || 'g';
+                    const suggestedUnit = getBestUnitForFood(food.name);
+                    const itemQuantity = itemQuantities[index] || (suggestedUnit === 'piece' ? '2' : food.quantity?.toString() || '100');
+                    const itemUnit = itemUnits[index] || suggestedUnit;
                     
                     // Calculate nutrition based on current quantity
                     const quantityNum = parseFloat(itemQuantity) || 0;
-                    let multiplier = 1;
+                    let multiplier = quantityNum / 100; // Default: assume quantity is in grams
+
+                    // Handle different units
                     switch (itemUnit) {
+                      case 'piece':
+                      case 'item':
+                      case 'slice':
+                        // For countable items, use the quantity directly (not per 100g)
+                        multiplier = quantityNum;
+                        break;
+                      case 'cup':
+                        // Approximate: 1 cup ≈ 150g for most foods
+                        multiplier = quantityNum * 1.5;
+                        break;
+                      case 'tbsp':
+                        // Approximate: 1 tbsp ≈ 15g
+                        multiplier = quantityNum * 0.15;
+                        break;
+                      case 'tsp':
+                        // Approximate: 1 tsp ≈ 5g
+                        multiplier = quantityNum * 0.05;
+                        break;
                       case 'kg':
+                        // 1 kg = 1000g
                         multiplier = quantityNum * 10;
+                        break;
+                      case 'oz':
+                        // 1 oz ≈ 28g
+                        multiplier = quantityNum * 0.28;
+                        break;
+                      case 'lb':
+                        // 1 lb ≈ 454g
+                        multiplier = quantityNum * 4.54;
                         break;
                       case 'g':
                       default:
+                        // Already in grams, divide by 100 to get per-100g multiplier
                         multiplier = quantityNum / 100;
                         break;
                     }
@@ -542,8 +605,14 @@ const MealLogging: React.FC = () => {
                                 fontSize: '14px'
                               }}
                             >
+                              <option value="piece">piece(s)</option>
+                              <option value="item">item(s)</option>
                               <option value="g">g</option>
                               <option value="kg">kg</option>
+                              <option value="cup">cup(s)</option>
+                              <option value="slice">slice(s)</option>
+                              <option value="tbsp">tbsp</option>
+                              <option value="tsp">tsp</option>
                             </select>
                           </div>
                         </div>
@@ -712,14 +781,16 @@ const MealLogging: React.FC = () => {
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
                   >
+                    <option value="piece">Piece(s)</option>
+                    <option value="item">Item(s)</option>
                     <option value="g">Grams (g)</option>
                     <option value="kg">Kilograms (kg)</option>
                     <option value="oz">Ounces (oz)</option>
                     <option value="lb">Pounds (lb)</option>
-                    <option value="cup">Cups</option>
+                    <option value="cup">Cup(s)</option>
+                    <option value="slice">Slice(s)</option>
                     <option value="tbsp">Tablespoons</option>
                     <option value="tsp">Teaspoons</option>
-                    <option value="piece">Pieces</option>
                   </select>
                 </div>
               </div>

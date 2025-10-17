@@ -421,16 +421,20 @@ OUTPUT SCHEMA (STRICT)
   }
 }
 
+UNIT SELECTION RULES
+- COUNTABLE ITEMS (use "piece" or "item"): eggs, chicken breasts, apples, bananas, bread slices, rotis, meat pieces, individual fruits
+- WEIGHT ITEMS (use "g"): rice, pasta, vegetables, meat cuts, grains, powders, liquids
+
 DEFAULT CONVERSIONS (use when units are given without weight; override if context implies otherwise)
-- 1 roti/chapati (medium, 18 cm): 40 g
-- 1 naan (plain): 100 g
-- 1 cup cooked rice (US cup): 150 g; jeera rice: 160 g
-- 1 cup cooked pasta: 140 g
-- 1 bowl dal (240 ml): 240 g
-- 1 tbsp oil/ghee: 14 g
-- 1 chicken breast, raw medium: 170 g; cooked/grilled: 120 g (water loss)
-- 1 egg (large): 50 g edible
-- 1 tortilla (8 in): 45 g
+- 1 roti/chapati (medium, 18 cm): 40 g, but log as "1 piece"
+- 1 naan (plain): 100 g, but log as "1 piece"
+- 1 cup cooked rice (US cup): 150 g (log as grams)
+- 1 cup cooked pasta: 140 g (log as grams)
+- 1 bowl dal (240 ml): 240 g (log as grams)
+- 1 tbsp oil/ghee: 14 g (log as grams)
+- 1 chicken breast, raw medium: 170 g; cooked/grilled: 120 g, but log as "1 piece"
+- 1 egg (large): 50 g edible, but log as "1 piece"
+- 1 tortilla (8 in): 45 g, but log as "1 piece"
 
 COOKING-METHOD ADJUSTMENTS (apply once, list in assumptions)
 - Grilled/boiled: no added oil.
@@ -1487,14 +1491,19 @@ OUTPUT SCHEMA (STRICT)
   ]
 }
 
-DEFAULT CONVERSIONS (use when quantities are not clear)
-- 1 egg (large): 50g
-- 1 chicken breast (medium): 120g
-- 1 cup cooked rice: 150g
-- 1 slice bread: 30g
-- 1 apple (medium): 150g
-- 1 banana (medium): 120g
-- 1 roti/chapati: 40g
+UNIT SELECTION RULES
+- COUNTABLE ITEMS (use "piece" or "item"): eggs, chicken breasts, apples, bananas, bread slices, rotis, meat pieces, individual fruits
+- WEIGHT ITEMS (use "g"): rice, pasta, vegetables, meat cuts, grains, powders, liquids
+
+DEFAULT CONVERSIONS
+- 1 egg (large): 50g, but log as "1 piece"
+- 1 chicken breast (medium): 120g, but log as "1 piece" 
+- 1 cup cooked rice: 150g (log as grams)
+- 1 slice bread: 30g, but log as "1 piece"
+- 1 apple (medium): 150g, but log as "1 piece"
+- 1 banana (medium): 120g, but log as "1 piece"
+- 1 roti/chapati: 40g, but log as "1 piece"
+- Rice, pasta, vegetables: always log in grams
 
 COOKING-METHOD ADJUSTMENTS
 - Fried: add 1 tbsp (14g) oil per 100g food
