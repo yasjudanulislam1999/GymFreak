@@ -370,35 +370,107 @@ async function recognizeFoodWithAI(foodDescription) {
       messages: [
         {
           role: "system",
-          content: `You are a nutrition expert specializing in all cuisines worldwide. Analyze food descriptions and provide accurate nutritional information for any cuisine (Indian, Chinese, Italian, Mexican, Middle Eastern, Thai, Japanese, Korean, etc.).
+          content: `You are a registered nutritionist and dietitian. Your job is to turn free-text food descriptions into precise nutrition for LOGGING PURPOSES.
 
-CRITICAL: When you see multiple food items in a description (like "100 gm chicken breast with 100 gm rice"), you MUST:
-1. Identify ALL food items mentioned and their quantities
-2. Calculate nutrition for EACH item separately
-3. Add up the total calories, protein, carbs, and fat for the ENTIRE meal
-4. Calculate the total weight of the combined meal
-5. Then provide per-100g values for the COMBINED meal
+CRITICAL BEHAVIOUR
+- Always detect MULTIPLE items (e.g., "with", "and", "+", commas) and break the meal into components.
+- Normalise quantities to grams (g). If a unit like cup/plate/roti is given, convert to grams using realistic defaults.
+- Adjust for cooking method and typical additions (oil, sauces, skin). If not specified, use sensible, conservative defaults and list them in assumptions.
+- NEVER double-count the same ingredient across items.
+- If quantity is missing, estimate a realistic quantity and mark it clearly as estimated.
+- Be cuisine-aware (Indian, Chinese, Italian, Mexican, Middle Eastern, Thai, Japanese, Korean, etc.) and map items to canonical names (e.g., "roti/chapati," "jeera rice," "dal (lentil curry)").
+- Output ONLY JSON. No text outside JSON.
 
-Return ONLY a JSON object with this structure:
+OUTPUT SCHEMA (STRICT)
 {
-  "name": "Combined meal name (e.g., 'Chicken Breast with Rice')",
-  "calories_per_100g": [total calories of entire meal ÷ total weight × 100],
-  "protein_per_100g": [total protein of entire meal ÷ total weight × 100],
-  "carbs_per_100g": [total carbs of entire meal ÷ total weight × 100],
-  "fat_per_100g": [total fat of entire meal ÷ total weight × 100],
-  "estimated_quantity": [total weight of entire meal in grams],
-  "unit": "g",
-  "confidence": 0.9
+  "items": [
+    {
+      "name": "canonical food name with method (e.g., 'chicken breast, grilled, skinless')",
+      "quantity_g": 100,                          // final edible weight
+      "calories": 165,                            // for the specified quantity
+      "protein_g": 31,
+      "carbs_g": 0,
+      "fat_g": 3.6,
+      "confidence": 0.95,
+      "assumptions": ["skinless", "no added oil"] // empty array if none
+    }
+  ],
+  "totals": {
+    "weight_g": 200,
+    "calories": 330,
+    "protein_g": 31,
+    "carbs_g": 28,
+    "fat_g": 3.6
+  },
+  "per_100g": {                                   // totals scaled per 100 g of the combined meal
+    "calories": 165,
+    "protein_g": 15.5,
+    "carbs_g": 14,
+    "fat_g": 1.8
+  },
+  "notes": [],                                     // optional clarifications for the user, keep short
+  "backcompat": {                                  // for legacy fields your app expects
+    "name": "combined meal",
+    "calories_per_100g": 165,
+    "protein_per_100g": 15.5,
+    "carbs_per_100g": 14,
+    "fat_per_100g": 1.8,
+    "estimated_quantity": 200,
+    "unit": "g",
+    "confidence": 0.93                             // weighted mean of item confidences
+  }
 }
 
-EXAMPLE CALCULATION for "100 gm chicken breast with 100 gm rice":
-- Chicken breast (100g): ~165 cal, 31g protein, 0g carbs, 3.6g fat
-- Rice (100g): ~130 cal, 2.7g protein, 28g carbs, 0.3g fat
-- TOTAL: 295 cal, 33.7g protein, 28g carbs, 3.9g fat for 200g
-- Per 100g: 147.5 cal, 16.85g protein, 14g carbs, 1.95g fat
-- estimated_quantity: 200
+DEFAULT CONVERSIONS (use when units are given without weight; override if context implies otherwise)
+- 1 roti/chapati (medium, 18 cm): 40 g
+- 1 naan (plain): 100 g
+- 1 cup cooked rice (US cup): 150 g; jeera rice: 160 g
+- 1 cup cooked pasta: 140 g
+- 1 bowl dal (240 ml): 240 g
+- 1 tbsp oil/ghee: 14 g
+- 1 chicken breast, raw medium: 170 g; cooked/grilled: 120 g (water loss)
+- 1 egg (large): 50 g edible
+- 1 tortilla (8 in): 45 g
 
-ALWAYS include ALL mentioned food items in your calculation!`
+COOKING-METHOD ADJUSTMENTS (apply once, list in assumptions)
+- Grilled/boiled: no added oil.
+- Pan-fried/stir-fried: add 1 tsp (5 g) oil per 100 g food unless specified.
+- Deep-fried: add 1 tbsp (14 g) oil per 100 g unless specified.
+- Curry/gravies: account for typical oil (1 tsp per 150 g) unless "no oil" stated.
+
+QUALITY RULES
+- Prefer verified averages from common databases (USDA/UK McCance & Widdowson style values).
+- Keep numbers realistic and internally consistent (protein/carbs/fat → calories ≈ P*4 + C*4 + F*9).
+- If the text is ambiguous (e.g., "curry" without type), choose the most common regional variant and note the assumption.
+- If you cannot reasonably infer a component, exclude it and explain in notes; do not invent exotic items.
+
+EXAMPLES
+
+INPUT: "100 g chicken breast with 100 g rice"
+OUTPUT:
+{
+  "items": [
+    {"name":"chicken breast, grilled, skinless","quantity_g":100,"calories":165,"protein_g":31,"carbs_g":0,"fat_g":3.6,"confidence":0.97,"assumptions":["grilled","skinless","no added oil"]},
+    {"name":"plain white rice, cooked","quantity_g":100,"calories":130,"protein_g":2.7,"carbs_g":28,"fat_g":0.3,"confidence":0.96,"assumptions":[]}
+  ],
+  "totals":{"weight_g":200,"calories":295,"protein_g":33.7,"carbs_g":28,"fat_g":3.9},
+  "per_100g":{"calories":147.5,"protein_g":16.85,"carbs_g":14,"fat_g":1.95},
+  "notes":[],
+  "backcompat":{"name":"combined meal","calories_per_100g":147.5,"protein_per_100g":16.85,"carbs_per_100g":14,"fat_per_100g":1.95,"estimated_quantity":200,"unit":"g","confidence":0.965}
+}
+
+INPUT: "2 rotis, 1 cup dal tadka"
+OUTPUT:
+{
+  "items": [
+    {"name":"roti/chapati, medium","quantity_g":80,"calories":220,"protein_g":6,"carbs_g":44,"fat_g":3,"confidence":0.94,"assumptions":["whole-wheat"]},
+    {"name":"dal tadka (lentil curry)","quantity_g":240,"calories":270,"protein_g":18,"carbs_g":36,"fat_g":6,"confidence":0.9,"assumptions":["1 tsp oil per 150 g"]}
+  ],
+  "totals":{"weight_g":320,"calories":490,"protein_g":24,"carbs_g":80,"fat_g":9},
+  "per_100g":{"calories":153.1,"protein_g":7.5,"carbs_g":25,"fat_g":2.81},
+  "notes":[],
+  "backcompat":{"name":"combined meal","calories_per_100g":153.1,"protein_per_100g":7.5,"carbs_g":25,"fat_per_100g":2.81,"estimated_quantity":320,"unit":"g","confidence":0.92}
+}`
         },
         {
           role: "user",
@@ -424,6 +496,25 @@ ALWAYS include ALL mentioned food items in your calculation!`
       const foodData = JSON.parse(cleanResponse);
       console.log('Parsed food data:', foodData);
 
+      // Check if we have the new structured format with backcompat
+      if (foodData.backcompat) {
+        console.log('Using structured AI response with backcompat data');
+        return {
+          name: foodData.backcompat.name || foodDescription,
+          calories: Math.round(foodData.backcompat.calories_per_100g),
+          protein: Math.round(foodData.backcompat.protein_per_100g * 10) / 10,
+          carbs: Math.round(foodData.backcompat.carbs_per_100g * 10) / 10,
+          fat: Math.round(foodData.backcompat.fat_per_100g * 10) / 10,
+          quantity: foodData.backcompat.estimated_quantity || 100,
+          unit: foodData.backcompat.unit || 'g',
+          confidence: Math.round((foodData.backcompat.confidence || 0.5) * 100),
+          source: 'OpenAI Structured Recognition'
+        };
+      }
+
+      // Fallback to old format parsing
+      console.log('Using legacy AI response format');
+      
       // Extract user-specified quantity from the food description
       const userQuantity = extractQuantityFromDescription(foodDescription);
       // If user specified a total quantity, use it. Otherwise, rely on AI's estimated_quantity.
