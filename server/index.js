@@ -270,40 +270,26 @@ Respond as their personal AI diet coach:`;
 function extractQuantityFromDescription(description) {
   const lowerDesc = description.toLowerCase();
   
-  // Patterns to match quantities with different units
+  // Patterns to match quantities at the beginning or clearly for the whole item
   const patterns = [
-    // 250gm, 500gm, 300gm, etc.
-    /(\d+(?:\.\d+)?)\s*(?:gm|gram|grams?)\b/,
-    // 250g, 500g, 300g, etc.
-    /(\d+(?:\.\d+)?)\s*g\b/,
-    // 250 kg, 500 kg, etc.
-    /(\d+(?:\.\d+)?)\s*(?:kg|kilogram|kilograms?)\b/,
-    // 2.5 kg, 1.5 kg, etc.
-    /(\d+(?:\.\d+)?)\s*(?:kg|kilogram|kilograms?)\b/,
-    // 1 cup, 2 cups, etc.
-    /(\d+(?:\.\d+)?)\s*(?:cup|cups)\b/,
-    // 1 slice, 2 slices, etc.
-    /(\d+(?:\.\d+)?)\s*(?:slice|slices)\b/,
-    // 1 piece, 2 pieces, etc.
-    /(\d+(?:\.\d+)?)\s*(?:piece|pieces)\b/
+    /^(\d+(?:\.\d+)?)\s*(?:gm|gram|grams?)\b/, // e.g., "300gm chicken biryani"
+    /^(\d+(?:\.\d+)?)\s*g\b/,                  // e.g., "300g chicken biryani"
+    /^(\d+(?:\.\d+)?)\s*(?:kg|kilogram|kilograms?)\b/, // e.g., "0.3kg chicken biryani"
   ];
   
   for (const pattern of patterns) {
     const match = lowerDesc.match(pattern);
     if (match) {
       let quantity = parseFloat(match[1]);
-      
-      // Convert kg to grams
       if (pattern.source.includes('kg')) {
         quantity = quantity * 1000;
       }
-      
-      console.log(`Extracted quantity: ${quantity}g from "${description}"`);
+      console.log(`Extracted explicit total quantity: ${quantity}g from "${description}"`);
       return quantity;
     }
   }
   
-  console.log(`No quantity found in "${description}"`);
+  console.log(`No explicit total quantity found at the beginning of "${description}"`);
   return null;
 }
 
@@ -386,26 +372,35 @@ async function recognizeFoodWithAI(foodDescription) {
           role: "system",
           content: `You are a nutrition expert specializing in all cuisines worldwide. Analyze food descriptions and provide accurate nutritional information for any cuisine (Indian, Chinese, Italian, Mexican, Middle Eastern, Thai, Japanese, Korean, etc.).
 
-For complex meals with multiple components, break them down and calculate total nutrition.
+For complex meals with multiple components (e.g., "100 gram of rice with 1 chicken breast", "pizza slice with coke"), you must:
+1. Identify all individual food items and their estimated quantities.
+2. Calculate the **total calories, protein, carbs, and fat for the ENTIRE COMBINED MEAL**.
+3. Determine the **total estimated quantity of the combined meal in grams**.
+4. Then, calculate the **average nutritional values per 100g of the combined meal** based on these totals.
 
 Return ONLY a JSON object with this structure:
 {
-  "name": "food name",
-  "calories_per_100g": 100,
-  "protein_per_100g": 10,
-  "carbs_per_100g": 15,
-  "fat_per_100g": 5,
-  "estimated_quantity": 150,
+  "name": "food name (e.g., 'Rice with Chicken Breast')",
+  "calories_per_100g": [average calories per 100g of the combined meal],
+  "protein_per_100g": [average protein per 100g of the combined meal],
+  "carbs_per_100g": [average carbs per 100g of the combined meal],
+  "fat_per_100g": [average fat per 100g of the combined meal],
+  "estimated_quantity": [total estimated quantity of the combined meal in grams],
   "unit": "g",
   "confidence": 0.9
 }
 
-Be specific about the food and provide realistic nutritional values based on the actual cuisine and ingredients. For example:
-- Indian roti: ~300 cal/100g, high carbs, low protein
-- Chicken karahi: ~200 cal/100g, high protein, moderate fat
-- Biryani: ~250 cal/100g, balanced macros
-- Pasta: ~130 cal/100g, high carbs
-- Pizza: ~300 cal/100g, balanced macros`
+Be specific about the food and provide realistic nutritional values based on the actual cuisine and ingredients.
+
+Example for "100 gram of rice with 1 chicken breast":
+- Assume 1 chicken breast is ~150g.
+- Total estimated quantity of the meal: 100g (rice) + 150g (chicken) = 250g.
+- Calculate total calories, protein, carbs, fat for 250g.
+- Then, divide these totals by 2.5 to get the average per 100g.
+
+Example for "pizza with coke":
+- Pizza slice (~100g) + Coke (330ml can) = ~430g total.
+- Calculate combined nutrition and divide by 4.3 for per-100g values.`
         },
         {
           role: "user",
@@ -432,7 +427,8 @@ Be specific about the food and provide realistic nutritional values based on the
 
       // Extract user-specified quantity from the food description
       const userQuantity = extractQuantityFromDescription(foodDescription);
-      const actualQuantity = userQuantity || foodData.estimated_quantity || 100;
+      // If user specified a total quantity, use it. Otherwise, rely on AI's estimated_quantity.
+      const actualQuantity = userQuantity !== null ? userQuantity : (foodData.estimated_quantity || 100);
       
       // Normalize nutritional values to ensure consistency (per 100g)
       const normalizedNutrition = normalizeNutritionValues(foodData.name || foodDescription, {
@@ -1322,7 +1318,7 @@ app.post('/api/ai/recognize-image', authenticateToken, async (req, res) => {
           content: [
             {
               type: "text",
-              text: "Analyze this food image and identify ALL food items visible. For each food item, provide nutritional information. Return ONLY a JSON object with this structure: {\"foods\": [{\"name\": \"item1\", \"calories_per_100g\": 100, \"protein_per_100g\": 10, \"carbs_per_100g\": 15, \"fat_per_100g\": 5, \"estimated_quantity\": 150, \"unit\": \"g\", \"confidence\": 0.9}, {\"name\": \"item2\", ...}]}. If it's a single item, still use the foods array with one object. Be specific about each food item and provide realistic nutritional values. Do not include any other text."
+              text: "Analyze this food image and identify ALL food items visible. For each food item, provide nutritional information. If multiple items are visible together (like a complete meal), you can either: 1) List each item separately, or 2) Create a combined meal entry. For combined meals, calculate the total nutrition of all visible items and provide per-100g values for the entire combined meal. Return ONLY a JSON object with this structure: {\"foods\": [{\"name\": \"item1\", \"calories_per_100g\": 100, \"protein_per_100g\": 10, \"carbs_per_100g\": 15, \"fat_per_100g\": 5, \"estimated_quantity\": 150, \"unit\": \"g\", \"confidence\": 0.9}, {\"name\": \"item2\", ...}]}. If it's a single item, still use the foods array with one object. Be specific about each food item and provide realistic nutritional values. Do not include any other text."
             },
             {
               type: "image_url",
