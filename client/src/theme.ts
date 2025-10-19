@@ -1,5 +1,6 @@
 // GymFreak App - Futuristic Dark Neon Theme
 // Central theme configuration for consistent UI across the app
+// Last updated: Test commit to verify git workflow
 
 export const theme = {
   // Color Palette
