@@ -266,6 +266,106 @@ Respond as their personal AI diet coach:`;
   }
 }
 
+// Generate streaming AI Coach response
+async function generateStreamingAICoachResponse(userMessage, userProfile, nutritionData, chatHistory = [], res) {
+  try {
+    // Build context from chat history
+    const historyContext = chatHistory.slice(-5).map(msg => 
+      `${msg.sender}: ${msg.message}`
+    ).join('\n');
+
+    const prompt = `You are an AI Diet Coach named "GymFreak Coach". You are knowledgeable, supportive, and personalized. 
+
+User Profile:
+- Height: ${userProfile.height} cm
+- Weight: ${userProfile.weight} kg
+- Age: ${userProfile.age} years
+- Gender: ${userProfile.gender}
+- Activity Level: ${userProfile.activityLevel}
+- Daily Calorie Goal (TDEE): ${nutritionData.tdee} calories
+
+Current Nutrition Status:
+- Calories Consumed Today: ${nutritionData.consumed.calories}
+- Calories Remaining: ${nutritionData.remaining.calories}
+- Protein Consumed: ${nutritionData.consumed.protein}g (Target: ${Math.round(userProfile.weight * 1.6)}g)
+- Carbs Consumed: ${nutritionData.consumed.carbs}g
+- Fat Consumed: ${nutritionData.consumed.fat}g
+
+Recent Chat History:
+${historyContext}
+
+User's Current Message: "${userMessage}"
+
+Instructions:
+1. Provide personalized, actionable advice based on their current nutrition status
+2. Always mention their current calorie balance (consumed vs remaining)
+3. Be encouraging and supportive
+4. Give specific food recommendations when appropriate
+5. Keep responses concise but helpful (2-3 paragraphs max)
+6. If they ask about specific foods, provide calorie estimates and healthier alternatives
+7. Always consider their TDEE and current macro intake
+
+Respond as their personal AI diet coach:`;
+
+    const stream = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 500,
+      temperature: 0.8,
+      stream: true
+    });
+
+    let fullResponse = '';
+    let messageId = null;
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        fullResponse += content;
+        
+        // Send the chunk to the client
+        res.write(`data: ${JSON.stringify({ 
+          type: 'chunk', 
+          content: content,
+          messageId: messageId 
+        })}\n\n`);
+      }
+    }
+
+    // Save the complete message to database
+    try {
+      const messageId = 'ai-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+      const result = await pool.query(
+        'INSERT INTO chat_messages (id, user_id, message, sender, timestamp) VALUES ($1, $2, $3, $4, NOW()) RETURNING timestamp',
+        [messageId, userProfile.id, fullResponse, 'ai']
+      );
+      
+      // Send completion signal
+      res.write(`data: ${JSON.stringify({ 
+        type: 'complete', 
+        messageId: messageId,
+        fullResponse: fullResponse 
+      })}\n\n`);
+    } catch (dbError) {
+      console.error('Database error saving AI message:', dbError);
+      res.write(`data: ${JSON.stringify({ 
+        type: 'complete', 
+        messageId: null,
+        fullResponse: fullResponse 
+      })}\n\n`);
+    }
+
+    res.end();
+  } catch (error) {
+    console.error('OpenAI streaming coach response error:', error);
+    res.write(`data: ${JSON.stringify({ 
+      type: 'error', 
+      content: "I'm sorry, I'm having trouble responding right now. Please try again later." 
+    })}\n\n`);
+    res.end();
+  }
+}
+
 // Extract quantity from user's food description
 function extractQuantityFromDescription(description) {
   const lowerDesc = description.toLowerCase();
@@ -1287,6 +1387,80 @@ app.post('/api/ai/coach-response', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('AI Coach response error:', error);
     res.status(500).json({ error: 'Failed to generate AI response' });
+  }
+});
+
+// Generate AI Coach Response with Streaming
+app.post('/api/ai/coach-response-stream', authenticateToken, async (req, res) => {
+  try {
+    const { message } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // Get user profile
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.userId]);
+    const userProfile = userResult.rows[0];
+    
+    if (!userProfile) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get nutrition data
+    const today = new Date().toISOString().split('T')[0];
+    const mealsResult = await pool.query(
+      'SELECT * FROM meals WHERE user_id = $1 AND date = $2',
+      [req.user.userId, today]
+    );
+    const meals = mealsResult.rows;
+    
+    const totalCalories = meals.reduce((sum, meal) => sum + (meal.calories || 0), 0);
+    const totalProtein = meals.reduce((sum, meal) => sum + (meal.protein || 0), 0);
+    const totalCarbs = meals.reduce((sum, meal) => sum + (meal.carbs || 0), 0);
+    const totalFat = meals.reduce((sum, meal) => sum + (meal.fat || 0), 0);
+    
+    const tdee = calculateTDEE(userProfile.height, userProfile.weight, userProfile.age, userProfile.gender, userProfile.activity_level);
+    
+    const nutritionData = {
+      tdee,
+      consumed: {
+        calories: totalCalories,
+        protein: Math.round(totalProtein * 10) / 10,
+        carbs: Math.round(totalCarbs * 10) / 10,
+        fat: Math.round(totalFat * 10) / 10
+      },
+      remaining: {
+        calories: Math.max(0, tdee - totalCalories),
+        protein: Math.max(0, Math.round((userProfile.weight * 1.6 - totalProtein) * 10) / 10),
+        carbs: Math.max(0, Math.round((tdee * 0.45 / 4 - totalCarbs) * 10) / 10),
+        fat: Math.max(0, Math.round((tdee * 0.25 / 9 - totalFat) * 10) / 10)
+      }
+    };
+
+    // Get recent chat history
+    const chatResult = await pool.query(
+      'SELECT * FROM chat_messages WHERE user_id = $1 ORDER BY timestamp DESC LIMIT 10',
+      [req.user.userId]
+    );
+    const chatHistory = chatResult.rows.reverse();
+
+    // Set up Server-Sent Events headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    // Generate streaming AI response
+    await generateStreamingAICoachResponse(message, userProfile, nutritionData, chatHistory, res);
+
+  } catch (error) {
+    console.error('AI Coach streaming response error:', error);
+    res.write(`data: ${JSON.stringify({ error: 'Failed to generate AI response' })}\n\n`);
+    res.end();
   }
 });
 
