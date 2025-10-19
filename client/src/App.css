@@ -1,5 +1,7 @@
 .App {
   min-height: 100vh;
+  background: var(--color-primary-bg);
+  color: var(--color-text-primary);
 }
 
 .navbar {

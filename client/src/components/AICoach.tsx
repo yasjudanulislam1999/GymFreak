@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { Send, Bot, User, MessageCircle, Target, TrendingUp } from 'lucide-react';
+import theme from '../theme';
 
 interface Message {
   id: string;
@@ -290,24 +291,132 @@ const AICoach: React.FC = () => {
     setIsTyping(true);
 
     try {
-      // Call OpenAI-powered AI Coach endpoint
-      const response = await axios.post('/api/ai/coach-response', {
-        message: inputText
+      // Create a placeholder AI message for streaming (but don't show it until we have content)
+      const aiMessageId = (Date.now() + 1).toString();
+      let aiMessageAdded = false;
+
+      // Use fetch with streaming
+      const response = await fetch('/api/ai/coach-response-stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ message: inputText })
       });
 
-      const aiResponse = response.data.response;
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: aiResponse,
-        sender: 'ai',
-        timestamp: new Date()
-      };
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      setMessages(prev => [...prev, aiMessage]);
-      saveMessage(aiMessage); // Save AI response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.type === 'chunk') {
+                  fullResponse += data.content;
+                  
+                  // Add the AI message to the chat if it's the first chunk
+                  if (!aiMessageAdded) {
+                    const aiMessage: Message = {
+                      id: aiMessageId,
+                      text: fullResponse,
+                      sender: 'ai',
+                      timestamp: new Date()
+                    };
+                    setMessages(prev => [...prev, aiMessage]);
+                    aiMessageAdded = true;
+                    setIsTyping(false); // Stop showing typing indicator once message appears
+                  } else {
+                    // Update the existing AI message with new content
+                    setMessages(prev => prev.map(msg => 
+                      msg.id === aiMessageId 
+                        ? { ...msg, text: fullResponse }
+                        : msg
+                    ));
+                  }
+                  
+                  // Add a small delay to make streaming more visible
+                  await new Promise(resolve => setTimeout(resolve, 50));
+                } else if (data.type === 'complete') {
+                  // Finalize the message
+                  const finalText = data.fullResponse || fullResponse;
+                  
+                  if (!aiMessageAdded) {
+                    // If no chunks were received, add the complete message
+                    const aiMessage: Message = {
+                      id: aiMessageId,
+                      text: finalText,
+                      sender: 'ai',
+                      timestamp: new Date()
+                    };
+                    setMessages(prev => [...prev, aiMessage]);
+                  } else {
+                    // Update the existing message
+                    setMessages(prev => prev.map(msg => 
+                      msg.id === aiMessageId 
+                        ? { ...msg, text: finalText }
+                        : msg
+                    ));
+                  }
+                  
+                  // Save the complete AI response
+                  const finalMessage: Message = {
+                    id: aiMessageId,
+                    text: finalText,
+                    sender: 'ai',
+                    timestamp: new Date()
+                  };
+                  saveMessage(finalMessage);
+                  
+                  setIsTyping(false); // Ensure typing indicator is hidden
+                  return;
+                } else if (data.type === 'error') {
+                  // Handle error
+                  if (!aiMessageAdded) {
+                    const aiMessage: Message = {
+                      id: aiMessageId,
+                      text: data.content || 'Sorry, I encountered an error.',
+                      sender: 'ai',
+                      timestamp: new Date()
+                    };
+                    setMessages(prev => [...prev, aiMessage]);
+                  } else {
+                    setMessages(prev => prev.map(msg => 
+                      msg.id === aiMessageId 
+                        ? { ...msg, text: data.content || 'Sorry, I encountered an error.' }
+                        : msg
+                    ));
+                  }
+                  setIsTyping(false); // Ensure typing indicator is hidden
+                  return;
+                }
+              } catch (parseError) {
+                console.error('Error parsing streaming data:', parseError);
+              }
+            }
+          }
+        }
+      }
+
     } catch (error) {
       console.error('Failed to get AI response:', error);
-      // Fallback to rule-based response if OpenAI fails
+      setIsTyping(false);
+      
+      // Fallback to rule-based response if streaming fails
       const fallbackResponse = generateAIResponse(inputText);
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -318,8 +427,6 @@ const AICoach: React.FC = () => {
 
       setMessages(prev => [...prev, aiMessage]);
       saveMessage(aiMessage);
-    } finally {
-      setIsTyping(false);
     }
   };
 
@@ -336,84 +443,195 @@ const AICoach: React.FC = () => {
       minHeight: '100vh',
       padding: '20px'
     }}>
-      <h1 className="text-center mb-6" style={{ color: '#ffffff', fontSize: '2.5rem', fontWeight: 'bold' }}>
+      <style>
+        {`
+          @keyframes typing {
+            0%, 60%, 100% {
+              transform: translateY(0);
+              opacity: 0.4;
+            }
+            30% {
+              transform: translateY(-10px);
+              opacity: 1;
+            }
+          }
+          
+          @keyframes fadeInText {
+            from {
+              opacity: 0;
+              transform: translateY(5px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          
+          @keyframes blink {
+            0%, 50% {
+              opacity: 1;
+            }
+            51%, 100% {
+              opacity: 0;
+            }
+          }
+        `}
+      </style>
+      <h1 className="text-center mb-6" style={{ 
+        color: theme.colors.primary.text, 
+        fontSize: '2.5rem', 
+        fontWeight: theme.typography.fontWeight.bold,
+        fontFamily: theme.typography.fontFamily.bold,
+        marginBottom: theme.spacing.xl
+      }}>
         AI Diet Coach
       </h1>
       
       {/* User Profile Summary */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.15)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '16px',
-        padding: '24px',
-        marginBottom: '24px',
-        border: '1px solid rgba(255, 255, 255, 0.25)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+        background: theme.colors.primary.surface,
+        borderRadius: theme.borderRadius.lg,
+        padding: theme.spacing.lg,
+        marginBottom: theme.spacing.lg,
+        border: `1px solid ${theme.colors.primary.border}`,
+        boxShadow: theme.shadows.glow.accent
       }}>
-        <h3 className="mb-4" style={{ color: '#ffffff', fontSize: '1.5rem' }}>
-          <Target size={24} style={{ marginRight: '8px', verticalAlign: 'middle', color: '#4ade80' }} />
+        <h3 className="mb-4" style={{ 
+          color: theme.colors.primary.text, 
+          fontSize: theme.typography.fontSize.subtitle,
+          fontFamily: theme.typography.fontFamily.bold,
+          marginBottom: theme.spacing.md
+        }}>
+          <Target size={24} style={{ 
+            marginRight: theme.spacing.sm, 
+            verticalAlign: 'middle', 
+            color: theme.colors.primary.accent 
+          }} />
           Your Profile Summary
         </h3>
-        <div className="grid grid-2" style={{ gap: '16px' }}>
-          <div style={{ color: '#f8fafc', fontSize: '14px' }}>
-            <strong style={{ color: '#4ade80', fontWeight: '600' }}>Name:</strong> {user?.name || 'Not set'}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: theme.spacing.md 
+        }}>
+          <div style={{ 
+            color: theme.colors.primary.textSecondary, 
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontFamily: theme.typography.fontFamily.primary
+          }}>
+            <strong style={{ 
+              color: theme.colors.primary.accent, 
+              fontWeight: theme.typography.fontWeight.semiBold 
+            }}>Name:</strong> {user?.name || 'Not set'}
           </div>
-          <div style={{ color: '#f8fafc', fontSize: '14px' }}>
-            <strong style={{ color: '#4ade80', fontWeight: '600' }}>Height:</strong> {user?.height ? `${user.height} cm` : 'Not set'}
+          <div style={{ 
+            color: theme.colors.primary.textSecondary, 
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontFamily: theme.typography.fontFamily.primary
+          }}>
+            <strong style={{ 
+              color: theme.colors.primary.accent, 
+              fontWeight: theme.typography.fontWeight.semiBold 
+            }}>Height:</strong> {user?.height ? `${user.height} cm` : 'Not set'}
           </div>
-          <div style={{ color: '#f8fafc', fontSize: '14px' }}>
-            <strong style={{ color: '#4ade80', fontWeight: '600' }}>Weight:</strong> {user?.weight ? `${user.weight} kg` : 'Not set'}
+          <div style={{ 
+            color: theme.colors.primary.textSecondary, 
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontFamily: theme.typography.fontFamily.primary
+          }}>
+            <strong style={{ 
+              color: theme.colors.primary.accent, 
+              fontWeight: theme.typography.fontWeight.semiBold 
+            }}>Weight:</strong> {user?.weight ? `${user.weight} kg` : 'Not set'}
           </div>
-          <div style={{ color: '#f8fafc', fontSize: '14px' }}>
-            <strong style={{ color: '#4ade80', fontWeight: '600' }}>Age:</strong> {user?.age ? `${user.age} years` : 'Not set'}
+          <div style={{ 
+            color: theme.colors.primary.textSecondary, 
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontFamily: theme.typography.fontFamily.primary
+          }}>
+            <strong style={{ 
+              color: theme.colors.primary.accent, 
+              fontWeight: theme.typography.fontWeight.semiBold 
+            }}>Age:</strong> {user?.age ? `${user.age} years` : 'Not set'}
           </div>
-          <div style={{ color: '#f8fafc', fontSize: '14px' }}>
-            <strong style={{ color: '#4ade80', fontWeight: '600' }}>Gender:</strong> {user?.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'Not set'}
+          <div style={{ 
+            color: theme.colors.primary.textSecondary, 
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontFamily: theme.typography.fontFamily.primary
+          }}>
+            <strong style={{ 
+              color: theme.colors.primary.accent, 
+              fontWeight: theme.typography.fontWeight.semiBold 
+            }}>Gender:</strong> {user?.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'Not set'}
           </div>
-          <div style={{ color: '#f8fafc', fontSize: '14px' }}>
-            <strong style={{ color: '#4ade80', fontWeight: '600' }}>Activity Level:</strong> {user?.activityLevel ? user.activityLevel.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Not set'}
+          <div style={{ 
+            color: theme.colors.primary.textSecondary, 
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontFamily: theme.typography.fontFamily.primary
+          }}>
+            <strong style={{ 
+              color: theme.colors.primary.accent, 
+              fontWeight: theme.typography.fontWeight.semiBold 
+            }}>Activity Level:</strong> {user?.activityLevel ? user.activityLevel.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Not set'}
           </div>
         </div>
         {(!user?.height || !user?.weight || !user?.age || !user?.gender || !user?.activityLevel) && (
-          <div className="mt-4 p-3" style={{ 
-            background: 'rgba(255, 193, 7, 0.2)', 
-            borderRadius: '8px', 
-            border: '1px solid rgba(255, 193, 7, 0.3)',
-            color: '#fbbf24'
+          <div style={{ 
+            marginTop: theme.spacing.md,
+            padding: theme.spacing.md,
+            background: `linear-gradient(135deg, ${theme.colors.primary.surface}, ${theme.colors.primary.border})`,
+            borderRadius: theme.borderRadius.md,
+            border: `1px solid ${theme.colors.primary.accent}`,
+            color: theme.colors.primary.accent,
+            fontFamily: theme.typography.fontFamily.primary,
+            fontSize: theme.typography.fontSize.bodySmall
           }}>
-            <strong>Note:</strong> Complete your profile for personalized advice!
+            <strong style={{ fontWeight: theme.typography.fontWeight.semiBold }}>Note:</strong> Complete your profile for personalized advice!
           </div>
         )}
       </div>
 
       {/* Chat Interface */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.15)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '16px',
-        padding: '24px',
-        border: '1px solid rgba(255, 255, 255, 0.25)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+        background: theme.colors.primary.surface,
+        borderRadius: theme.borderRadius.lg,
+        padding: theme.spacing.lg,
+        border: `1px solid ${theme.colors.primary.border}`,
+        boxShadow: theme.shadows.glow.accent
       }}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <MessageCircle size={24} style={{ marginRight: '8px', color: '#4ade80' }} />
-            <h3 style={{ color: '#ffffff', fontSize: '1.5rem' }}>Chat with AI Coach</h3>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          marginBottom: theme.spacing.md
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <MessageCircle size={24} style={{ 
+              marginRight: theme.spacing.sm, 
+              color: theme.colors.primary.accent 
+            }} />
+            <h3 style={{ 
+              color: theme.colors.primary.text, 
+              fontSize: theme.typography.fontSize.subtitle,
+              fontFamily: theme.typography.fontFamily.bold
+            }}>Chat with AI Coach</h3>
           </div>
           <button
             onClick={clearChat}
             style={{ 
-              fontSize: '12px', 
-              padding: '8px 16px',
-              background: 'rgba(239, 68, 68, 0.8)',
-              color: '#ffffff',
+              fontSize: theme.typography.fontSize.caption, 
+              padding: `${theme.spacing.sm} ${theme.spacing.md}`,
+              background: theme.colors.primary.error,
+              color: theme.colors.primary.text,
               border: 'none',
-              borderRadius: '8px',
+              borderRadius: theme.borderRadius.md,
               cursor: 'pointer',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              fontFamily: theme.typography.fontFamily.primary,
+              fontWeight: theme.typography.fontWeight.medium
             }}
-            onMouseOver={(e) => (e.target as HTMLButtonElement).style.background = 'rgba(239, 68, 68, 1)'}
-            onMouseOut={(e) => (e.target as HTMLButtonElement).style.background = 'rgba(239, 68, 68, 0.8)'}
+            onMouseOver={(e) => (e.target as HTMLButtonElement).style.background = '#e53e3e'}
+            onMouseOut={(e) => (e.target as HTMLButtonElement).style.background = theme.colors.primary.error}
           >
             Clear Chat
           </button>
@@ -424,11 +642,11 @@ const AICoach: React.FC = () => {
           style={{ 
             height: '500px', 
             overflowY: 'auto', 
-            borderRadius: '12px', 
-            padding: '20px',
-            marginBottom: '20px',
-            background: 'rgba(0, 0, 0, 0.2)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: theme.borderRadius.md, 
+            padding: theme.spacing.lg,
+            marginBottom: theme.spacing.lg,
+            background: theme.colors.primary.background,
+            border: `1px solid ${theme.colors.primary.border}`,
             position: 'relative'
           }}
         >
@@ -473,11 +691,11 @@ const AICoach: React.FC = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: message.sender === 'user' ? '#4ade80' : '#6b7280',
-                      color: '#ffffff',
-                      marginLeft: message.sender === 'user' ? '8px' : '0px',
-                      marginRight: message.sender === 'user' ? '0px' : '8px',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+                      backgroundColor: message.sender === 'user' ? theme.colors.primary.accent : theme.colors.primary.accentSecondary,
+                      color: theme.colors.primary.text,
+                      marginLeft: message.sender === 'user' ? theme.spacing.sm : '0px',
+                      marginRight: message.sender === 'user' ? '0px' : theme.spacing.sm,
+                      boxShadow: theme.shadows.glow.accent,
                       fontSize: '12px'
                     }}
                   >
@@ -487,34 +705,50 @@ const AICoach: React.FC = () => {
                   {/* Message Bubble */}
                   <div
                     style={{
-                      padding: '12px 16px',
-                      backgroundColor: message.sender === 'user' ? '#4ade80' : '#ffffff',
-                      color: message.sender === 'user' ? '#ffffff' : '#1f2937',
+                      padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+                      backgroundColor: message.sender === 'user' ? theme.colors.primary.accent : theme.colors.primary.surface,
+                      color: message.sender === 'user' ? theme.colors.primary.text : theme.colors.primary.text,
                       maxWidth: '250px',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                      boxShadow: message.sender === 'user' ? theme.shadows.glow.accent : theme.shadows.normal.sm,
                       borderRadius: message.sender === 'user' 
-                        ? '18px 18px 4px 18px' 
-                        : '18px 18px 18px 4px',
+                        ? `${theme.borderRadius.lg} ${theme.borderRadius.lg} ${theme.borderRadius.sm} ${theme.borderRadius.lg}` 
+                        : `${theme.borderRadius.lg} ${theme.borderRadius.lg} ${theme.borderRadius.lg} ${theme.borderRadius.sm}`,
                       position: 'relative',
                       wordWrap: 'break-word',
-                      transition: 'all 0.2s ease-out'
+                      transition: 'all 0.2s ease-out',
+                      border: message.sender === 'ai' ? `1px solid ${theme.colors.primary.border}` : 'none'
                     }}
                   >
                     {/* Message Text */}
                     <div className="text-sm whitespace-pre-line" style={{ 
-                      lineHeight: '1.3',
-                      color: message.sender === 'user' ? '#ffffff' : '#1f2937',
-                      fontWeight: '400'
+                      lineHeight: theme.typography.lineHeight.normal,
+                      color: message.sender === 'user' ? theme.colors.primary.text : theme.colors.primary.text,
+                      fontWeight: theme.typography.fontWeight.regular,
+                      fontFamily: theme.typography.fontFamily.primary,
+                      fontSize: theme.typography.fontSize.bodySmall,
+                      animation: message.sender === 'ai' && message.text ? 'fadeInText 0.3s ease-in' : 'none',
+                      position: 'relative'
                     }}>
                       {message.text}
+                      {message.sender === 'ai' && isTyping && message.text && (
+                        <span style={{
+                          display: 'inline-block',
+                          width: '2px',
+                          height: '16px',
+                          backgroundColor: theme.colors.primary.accent,
+                          marginLeft: '2px',
+                          animation: 'blink 1s infinite'
+                        }}></span>
+                      )}
                     </div>
                     
                     {/* Timestamp */}
                     <div style={{ 
                       textAlign: message.sender === 'user' ? 'right' : 'left',
-                      fontSize: '10px',
-                      color: message.sender === 'user' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(107, 114, 128, 0.8)',
-                      marginTop: '4px'
+                      fontSize: theme.typography.fontSize.caption,
+                      color: message.sender === 'user' ? 'rgba(255, 255, 255, 0.8)' : theme.colors.primary.textSecondary,
+                      marginTop: theme.spacing.xs,
+                      fontFamily: theme.typography.fontFamily.primary
                     }}>
                       {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
@@ -524,21 +758,30 @@ const AICoach: React.FC = () => {
             ))}
             
             {isTyping && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '16px', width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-end', width: 'fit-content' }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'flex-start', 
+                marginBottom: theme.spacing.md, 
+                width: '100%' 
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-end', 
+                  width: 'fit-content' 
+                }}>
                   {/* AI Avatar */}
                   <div style={{
                     flexShrink: 0,
                     width: '32px',
                     height: '32px',
                     borderRadius: '50%',
-                    backgroundColor: '#6b7280',
-                    color: '#ffffff',
-                    marginRight: '8px',
+                    backgroundColor: theme.colors.primary.accentSecondary,
+                    color: theme.colors.primary.text,
+                    marginRight: theme.spacing.sm,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+                    boxShadow: theme.shadows.glow.blue,
                     fontSize: '12px'
                   }}>
                     <Bot size={14} />
@@ -546,17 +789,46 @@ const AICoach: React.FC = () => {
                   
                   {/* Typing Bubble */}
                   <div style={{
-                    backgroundColor: '#ffffff',
-                    padding: '12px 16px',
-                    borderRadius: '18px 18px 18px 4px',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                    maxWidth: '120px'
+                    backgroundColor: theme.colors.primary.surface,
+                    padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+                    borderRadius: `${theme.borderRadius.lg} ${theme.borderRadius.lg} ${theme.borderRadius.lg} ${theme.borderRadius.sm}`,
+                    boxShadow: theme.shadows.normal.sm,
+                    border: `1px solid ${theme.colors.primary.border}`,
+                    maxWidth: '120px',
+                    display: 'flex',
+                    alignItems: 'center'
                   }}>
-                    <div className="flex items-center">
-                      <div className="flex space-x-1">
-                        <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
+                      <span style={{ 
+                        fontSize: theme.typography.fontSize.caption, 
+                        color: theme.colors.primary.textSecondary, 
+                        marginRight: theme.spacing.sm,
+                        fontFamily: theme.typography.fontFamily.primary
+                      }}>AI is typing</span>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        <div style={{
+                          width: '4px',
+                          height: '4px',
+                          backgroundColor: theme.colors.primary.accent,
+                          borderRadius: '50%',
+                          animation: 'typing 1.4s infinite ease-in-out'
+                        }}></div>
+                        <div style={{
+                          width: '4px',
+                          height: '4px',
+                          backgroundColor: theme.colors.primary.accent,
+                          borderRadius: '50%',
+                          animation: 'typing 1.4s infinite ease-in-out',
+                          animationDelay: '0.2s'
+                        }}></div>
+                        <div style={{
+                          width: '4px',
+                          height: '4px',
+                          backgroundColor: theme.colors.primary.accent,
+                          borderRadius: '50%',
+                          animation: 'typing 1.4s infinite ease-in-out',
+                          animationDelay: '0.4s'
+                        }}></div>
                       </div>
                     </div>
                   </div>
@@ -568,7 +840,7 @@ const AICoach: React.FC = () => {
         </div>
 
         {/* Input */}
-        <div className="flex gap-3">
+        <div style={{ display: 'flex', gap: theme.spacing.md }}>
           <input
             type="text"
             value={inputText}
@@ -578,28 +850,29 @@ const AICoach: React.FC = () => {
             disabled={isTyping}
             style={{
               flex: 1,
-              padding: '12px 16px',
+              padding: `${theme.spacing.md} ${theme.spacing.lg}`,
               borderRadius: '25px',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              background: 'rgba(255, 255, 255, 0.15)',
-              color: '#ffffff',
-              fontSize: '14px',
+              border: `1px solid ${theme.colors.primary.border}`,
+              background: theme.colors.primary.surface,
+              color: theme.colors.primary.text,
+              fontSize: theme.typography.fontSize.bodySmall,
               outline: 'none',
-              backdropFilter: 'blur(10px)',
-              fontWeight: '400'
+              fontFamily: theme.typography.fontFamily.primary,
+              fontWeight: theme.typography.fontWeight.regular,
+              transition: 'all 0.3s ease'
             }}
-            onFocus={(e) => (e.target as HTMLInputElement).style.border = '1px solid #4ade80'}
-            onBlur={(e) => (e.target as HTMLInputElement).style.border = '1px solid rgba(255, 255, 255, 0.2)'}
+            onFocus={(e) => (e.target as HTMLInputElement).style.border = `1px solid ${theme.colors.primary.accent}`}
+            onBlur={(e) => (e.target as HTMLInputElement).style.border = `1px solid ${theme.colors.primary.border}`}
           />
           <button
             onClick={handleSendMessage}
             disabled={!inputText.trim() || isTyping}
             style={{
-              padding: '12px',
+              padding: theme.spacing.md,
               borderRadius: '50%',
               border: 'none',
-              background: inputText.trim() && !isTyping ? '#4ade80' : 'rgba(255, 255, 255, 0.2)',
-              color: '#ffffff',
+              background: inputText.trim() && !isTyping ? theme.gradients.accent : theme.colors.primary.border,
+              color: theme.colors.primary.text,
               cursor: inputText.trim() && !isTyping ? 'pointer' : 'not-allowed',
               transition: 'all 0.3s ease',
               width: '48px',
@@ -607,7 +880,7 @@ const AICoach: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+              boxShadow: inputText.trim() && !isTyping ? theme.shadows.glow.accent : theme.shadows.normal.sm
             }}
           >
             <Send size={18} />
@@ -617,58 +890,86 @@ const AICoach: React.FC = () => {
 
       {/* Quick Tips */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.15)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '16px',
-        padding: '24px',
-        marginTop: '24px',
-        border: '1px solid rgba(255, 255, 255, 0.25)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+        background: theme.colors.primary.surface,
+        borderRadius: theme.borderRadius.lg,
+        padding: theme.spacing.lg,
+        marginTop: theme.spacing.lg,
+        border: `1px solid ${theme.colors.primary.border}`,
+        boxShadow: theme.shadows.glow.accent
       }}>
-        <h3 className="mb-4" style={{ color: '#ffffff', fontSize: '1.5rem' }}>
-          <TrendingUp size={24} style={{ marginRight: '8px', verticalAlign: 'middle', color: '#4ade80' }} />
+        <h3 style={{ 
+          color: theme.colors.primary.text, 
+          fontSize: theme.typography.fontSize.subtitle,
+          fontFamily: theme.typography.fontFamily.bold,
+          marginBottom: theme.spacing.md
+        }}>
+          <TrendingUp size={24} style={{ 
+            marginRight: theme.spacing.sm, 
+            verticalAlign: 'middle', 
+            color: theme.colors.primary.accent 
+          }} />
           Quick Tips
         </h3>
-        <div className="grid grid-2" style={{ gap: '16px' }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+          gap: theme.spacing.md 
+        }}>
           <div style={{ 
-            padding: '16px', 
-            background: 'rgba(59, 130, 246, 0.2)', 
-            borderRadius: '12px',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            color: '#f8fafc',
-            fontSize: '14px'
+            padding: theme.spacing.md, 
+            background: `linear-gradient(135deg, ${theme.colors.primary.accentSecondary}20, ${theme.colors.primary.accent}20)`, 
+            borderRadius: theme.borderRadius.md,
+            border: `1px solid ${theme.colors.primary.accentSecondary}50`,
+            color: theme.colors.primary.text,
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontFamily: theme.typography.fontFamily.primary
           }}>
-            <strong style={{ color: '#60a5fa', fontWeight: '600' }}>💡 Try asking:</strong> "What should I eat before a workout?"
+            <strong style={{ 
+              color: theme.colors.primary.accentSecondary, 
+              fontWeight: theme.typography.fontWeight.semiBold 
+            }}>💡 Try asking:</strong> "What should I eat before a workout?"
           </div>
           <div style={{ 
-            padding: '16px', 
-            background: 'rgba(34, 197, 94, 0.2)', 
-            borderRadius: '12px',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-            color: '#f8fafc',
-            fontSize: '14px'
+            padding: theme.spacing.md, 
+            background: `linear-gradient(135deg, ${theme.colors.primary.accent}20, #00BFA620)`, 
+            borderRadius: theme.borderRadius.md,
+            border: `1px solid ${theme.colors.primary.accent}50`,
+            color: theme.colors.primary.text,
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontFamily: theme.typography.fontFamily.primary
           }}>
-            <strong style={{ color: '#4ade80', fontWeight: '600' }}>🍎 Nutrition:</strong> "How much protein do I need daily?"
+            <strong style={{ 
+              color: theme.colors.primary.accent, 
+              fontWeight: theme.typography.fontWeight.semiBold 
+            }}>🍎 Nutrition:</strong> "How much protein do I need daily?"
           </div>
           <div style={{ 
-            padding: '16px', 
-            background: 'rgba(168, 85, 247, 0.2)', 
-            borderRadius: '12px',
-            border: '1px solid rgba(168, 85, 247, 0.3)',
-            color: '#f8fafc',
-            fontSize: '14px'
+            padding: theme.spacing.md, 
+            background: `linear-gradient(135deg, #a855f720, #8b5cf620)`, 
+            borderRadius: theme.borderRadius.md,
+            border: '1px solid #a855f750',
+            color: theme.colors.primary.text,
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontFamily: theme.typography.fontFamily.primary
           }}>
-            <strong style={{ color: '#a855f7', fontWeight: '600' }}>🎯 Goals:</strong> "Help me plan my meals for weight loss"
+            <strong style={{ 
+              color: '#a855f7', 
+              fontWeight: theme.typography.fontWeight.semiBold 
+            }}>🎯 Goals:</strong> "Help me plan my meals for weight loss"
           </div>
           <div style={{ 
-            padding: '16px', 
-            background: 'rgba(249, 115, 22, 0.2)', 
-            borderRadius: '12px',
-            border: '1px solid rgba(249, 115, 22, 0.3)',
-            color: '#f8fafc',
-            fontSize: '14px'
+            padding: theme.spacing.md, 
+            background: `linear-gradient(135deg, #fb923c20, #f9731620)`, 
+            borderRadius: theme.borderRadius.md,
+            border: '1px solid #fb923c50',
+            color: theme.colors.primary.text,
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontFamily: theme.typography.fontFamily.primary
           }}>
-            <strong style={{ color: '#fb923c', fontWeight: '600' }}>💪 Fitness:</strong> "What's the best post-workout meal?"
+            <strong style={{ 
+              color: '#fb923c', 
+              fontWeight: theme.typography.fontWeight.semiBold 
+            }}>💪 Fitness:</strong> "What's the best post-workout meal?"
           </div>
         </div>
       </div>

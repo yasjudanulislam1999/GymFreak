@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Trash2, Clock, Utensils, Sparkles, Loader, Camera } from 'lucide-react';
+import { Plus, Trash2, Clock, Utensils, Sparkles, Loader, Camera, CheckCircle } from 'lucide-react';
 import CameraCapture from './CameraCapture';
+import theme from '../theme';
 
 interface Food {
   id: string;
@@ -48,6 +49,7 @@ const MealLogging: React.FC = () => {
   const [selectedAiItems, setSelectedAiItems] = useState<Set<number>>(new Set());
   const [itemQuantities, setItemQuantities] = useState<{[key: number]: string}>({});
   const [itemUnits, setItemUnits] = useState<{[key: number]: string}>({});
+  const [removingItems, setRemovingItems] = useState<Set<number>>(new Set());
   
   // Camera states
   const [showCamera, setShowCamera] = useState(false);
@@ -161,7 +163,7 @@ const MealLogging: React.FC = () => {
       }
       
       // Mark this item as selected
-      setSelectedAiItems(prev => new Set([...Array.from(prev), foodIndex]));
+      setSelectedAiItems(prev => new Set(Array.from(prev).concat(foodIndex)));
     }
   };
 
@@ -336,85 +338,150 @@ const MealLogging: React.FC = () => {
   };
 
   return (
-    <div>
-      <h1 className="text-center mb-4">Meal Logging</h1>
+    <div style={{ padding: '20px', background: theme.colors.primary.background, minHeight: '100vh' }}>
+      <h1 className="text-center mb-4" style={{ 
+        color: theme.colors.primary.text, 
+        fontSize: theme.typography.fontSize.title,
+        fontFamily: theme.typography.fontFamily.bold,
+        fontWeight: theme.typography.fontWeight.bold,
+        marginBottom: theme.spacing.lg
+      }}>
+        Meal Logging
+      </h1>
 
       {/* Log New Meal */}
-      <div className="card">
-        <h3 className="mb-4">
-          <Plus size={24} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+      <div className="card" style={{
+        background: theme.colors.primary.surface,
+        border: `1px solid ${theme.colors.primary.border}`,
+        borderRadius: theme.borderRadius.lg,
+        padding: theme.spacing.lg,
+        marginBottom: theme.spacing.lg,
+        boxShadow: theme.shadows.glow.accent
+      }}>
+        <h3 style={{
+          color: theme.colors.primary.text,
+          fontSize: theme.typography.fontSize.subtitle,
+          fontFamily: theme.typography.fontFamily.bold,
+          fontWeight: theme.typography.fontWeight.bold,
+          marginBottom: theme.spacing.md,
+          display: 'flex',
+          alignItems: 'center'
+        }}>
+          <Plus size={24} style={{ marginRight: theme.spacing.sm, color: theme.colors.primary.accent }} />
           Log New Meal
         </h3>
 
         {/* Quick Camera Button */}
         <div style={{ 
-          marginBottom: '24px', 
+          marginBottom: theme.spacing.lg, 
           textAlign: 'center',
-          padding: '20px',
-          background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-          borderRadius: '16px',
-          border: '2px dashed #cbd5e1'
+          padding: theme.spacing.lg,
+          background: `linear-gradient(135deg, ${theme.colors.primary.surface}, ${theme.colors.primary.border})`,
+          borderRadius: theme.borderRadius.lg,
+          border: `2px dashed ${theme.colors.primary.accent}50`
         }}>
           <button
             type="button"
             onClick={() => setShowCamera(true)}
             style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
+              background: theme.gradients.accent,
+              color: theme.colors.primary.text,
               border: 'none',
-              padding: '16px 32px',
-              fontSize: '18px',
-              fontWeight: '700',
+              padding: `${theme.spacing.md} ${theme.spacing.xl}`,
+              fontSize: theme.typography.fontSize.body,
+              fontWeight: theme.typography.fontWeight.bold,
               display: 'flex',
               alignItems: 'center',
               margin: '0 auto',
               borderRadius: '25px',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
-              boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)',
-              textTransform: 'none'
+              boxShadow: theme.shadows.glow.accent,
+              fontFamily: theme.typography.fontFamily.primary
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-3px)';
-              e.currentTarget.style.boxShadow = '0 12px 35px rgba(102, 126, 234, 0.4)';
+              e.currentTarget.style.boxShadow = '0 12px 35px rgba(0, 255, 127, 0.4)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.3)';
+              e.currentTarget.style.boxShadow = theme.shadows.glow.accent;
             }}
           >
-            <Camera size={24} style={{ marginRight: '12px' }} />
+            <Camera size={24} style={{ marginRight: theme.spacing.md }} />
             📸 Take Photo of Food
           </button>
           <p style={{ 
-            marginTop: '12px', 
-            fontSize: '15px', 
-            color: '#64748b',
-            fontWeight: '500',
-            marginBottom: '0'
+            marginTop: theme.spacing.md, 
+            fontSize: theme.typography.fontSize.bodySmall, 
+            color: theme.colors.primary.textSecondary,
+            fontWeight: theme.typography.fontWeight.medium,
+            marginBottom: '0',
+            fontFamily: theme.typography.fontFamily.primary
           }}>
             Point your camera at food for instant AI recognition
           </p>
         </div>
 
         {message && (
-          <div className={message.includes('Error') ? 'error-message' : 'success-message'}>
+          <div style={{
+            padding: theme.spacing.md,
+            borderRadius: theme.borderRadius.md,
+            marginBottom: theme.spacing.md,
+            fontFamily: theme.typography.fontFamily.primary,
+            fontSize: theme.typography.fontSize.bodySmall,
+            fontWeight: theme.typography.fontWeight.medium,
+            background: message.includes('Error') 
+              ? `linear-gradient(135deg, ${theme.colors.primary.error}20, ${theme.colors.primary.error}10)`
+              : `linear-gradient(135deg, ${theme.colors.primary.accent}20, ${theme.colors.primary.accent}10)`,
+            border: `1px solid ${message.includes('Error') ? theme.colors.primary.error : theme.colors.primary.accent}`,
+            color: message.includes('Error') ? theme.colors.primary.error : theme.colors.primary.accent
+          }}>
             {message}
           </div>
         )}
 
         {/* AI Food Recognition Section */}
-        <div className="card" style={{ marginBottom: '20px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-          <div className="flex flex-between mb-4">
-            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
-              <Sparkles size={24} style={{ marginRight: '8px' }} />
+        <div className="card" style={{ 
+          marginBottom: theme.spacing.lg, 
+          background: `linear-gradient(135deg, ${theme.colors.primary.accentSecondary}, #00BFA6)`, 
+          color: theme.colors.primary.text,
+          borderRadius: theme.borderRadius.lg,
+          padding: theme.spacing.lg,
+          boxShadow: theme.shadows.glow.blue
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: theme.spacing.md
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              display: 'flex', 
+              alignItems: 'center',
+              fontSize: theme.typography.fontSize.subtitle,
+              fontFamily: theme.typography.fontFamily.bold,
+              fontWeight: theme.typography.fontWeight.bold
+            }}>
+              <Sparkles size={24} style={{ marginRight: theme.spacing.sm, color: theme.colors.primary.text }} />
               AI Food Recognition
             </h3>
             <button
               type="button"
               onClick={() => setShowAiSection(!showAiSection)}
-              className="btn"
-              style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)' }}
+              style={{ 
+                background: 'rgba(255,255,255,0.2)', 
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: theme.colors.primary.text,
+                padding: `${theme.spacing.sm} ${theme.spacing.md}`,
+                borderRadius: theme.borderRadius.md,
+                cursor: 'pointer',
+                fontFamily: theme.typography.fontFamily.primary,
+                fontSize: theme.typography.fontSize.bodySmall,
+                fontWeight: theme.typography.fontWeight.medium,
+                transition: 'all 0.3s ease'
+              }}
             >
               {showAiSection ? 'Hide' : 'Show'} AI
             </button>
@@ -422,37 +489,120 @@ const MealLogging: React.FC = () => {
           
           {showAiSection && (
             <div>
-              <p style={{ marginBottom: '16px', opacity: 0.9 }}>
+              <p style={{ 
+                marginBottom: theme.spacing.md, 
+                opacity: 0.9,
+                fontFamily: theme.typography.fontFamily.primary,
+                fontSize: theme.typography.fontSize.bodySmall,
+                color: theme.colors.primary.text
+              }}>
                 Describe your food in natural language or take a photo to let AI extract the nutritional information!
               </p>
               
-              <div className="flex gap-2 mb-3">
+              {/* Camera Button - Full Width */}
+              <div style={{ marginBottom: theme.spacing.lg }}>
                 <button
                   type="button"
                   onClick={() => setShowCamera(true)}
-                  className="btn"
-                  style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center' }}
+                  style={{ 
+                    background: 'rgba(255,255,255,0.2)', 
+                    border: '1px solid rgba(255,255,255,0.3)', 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+                    borderRadius: theme.borderRadius.lg,
+                    color: theme.colors.primary.text,
+                    fontFamily: theme.typography.fontFamily.primary,
+                    fontSize: theme.typography.fontSize.body,
+                    fontWeight: theme.typography.fontWeight.medium,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    marginBottom: theme.spacing.sm
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
                 >
-                  <Camera size={18} style={{ marginRight: '8px' }} />
+                  <Camera size={20} style={{ marginRight: theme.spacing.sm }} />
                   Take Photo
                 </button>
               </div>
               
-              <div className="flex gap-2">
+              {/* Text Input and Recognize Button */}
+              <div style={{ 
+                display: 'flex', 
+                gap: theme.spacing.md,
+                alignItems: 'stretch'
+              }}>
                 <input
                   type="text"
-                  className="form-input"
                   value={aiInput}
                   onChange={(e) => setAiInput(e.target.value)}
                   placeholder="e.g., 'grilled chicken breast with rice and broccoli'"
-                  style={{ flex: 1 }}
+                  style={{ 
+                    flex: 1,
+                    padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+                    borderRadius: theme.borderRadius.lg,
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    background: 'rgba(255,255,255,0.1)',
+                    color: theme.colors.primary.text,
+                    fontFamily: theme.typography.fontFamily.primary,
+                    fontSize: theme.typography.fontSize.body,
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.border = '1px solid rgba(255,255,255,0.5)';
+                    e.target.style.background = 'rgba(255,255,255,0.15)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.border = '1px solid rgba(255,255,255,0.3)';
+                    e.target.style.background = 'rgba(255,255,255,0.1)';
+                  }}
                 />
                 <button
                   type="button"
                   onClick={recognizeFoodWithAI}
                   disabled={aiLoading || !aiInput.trim()}
-                  className="btn"
-                  style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)' }}
+                  style={{ 
+                    background: aiLoading || !aiInput.trim() 
+                      ? 'rgba(255,255,255,0.1)' 
+                      : 'rgba(255,255,255,0.2)', 
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: theme.colors.primary.text,
+                    padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+                    borderRadius: theme.borderRadius.lg,
+                    cursor: aiLoading || !aiInput.trim() ? 'not-allowed' : 'pointer',
+                    fontFamily: theme.typography.fontFamily.primary,
+                    fontSize: theme.typography.fontSize.body,
+                    fontWeight: theme.typography.fontWeight.medium,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                    transition: 'all 0.3s ease',
+                    opacity: aiLoading || !aiInput.trim() ? 0.6 : 1,
+                    minWidth: '120px',
+                    justifyContent: 'center'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!aiLoading && aiInput.trim()) {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!aiLoading && aiInput.trim()) {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }
+                  }}
                 >
                   {aiLoading ? <Loader size={16} className="animate-spin" /> : <Sparkles size={16} />}
                   {aiLoading ? 'Analyzing...' : 'Recognize'}
@@ -561,12 +711,21 @@ const MealLogging: React.FC = () => {
                         background: isSelected ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.05)', 
                         borderRadius: '8px',
                         border: isSelected ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255,255,255,0.1)',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.3s ease-out',
+                        transform: removingItems.has(index) ? 'translateX(-100%)' : 'translateX(0)',
+                        opacity: removingItems.has(index) ? 0 : 1,
+                        overflow: 'hidden'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                           <h5 style={{ margin: 0, color: '#fff', fontSize: '16px' }}>{food.name}</h5>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '12px', opacity: 0.8 }}>{food.confidence}% confidence</span>
+                            {removingItems.has(index) ? (
+                              <span style={{ fontSize: '12px', color: '#10b981', fontWeight: '600' }}>
+                                ✓ Logged!
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '12px', opacity: 0.8 }}>{food.confidence}% confidence</span>
+                            )}
                           </div>
                         </div>
                         
@@ -641,23 +800,56 @@ const MealLogging: React.FC = () => {
                               setSelectedFood(updatedFood);
                               setQuantity(quantityNum.toString());
                               setUnit(itemUnit);
-                              setSelectedAiItems(prev => new Set([...Array.from(prev), index]));
+                              setSelectedAiItems(prev => new Set(Array.from(prev).concat(index)));
+                              
+                              // Remove the used item from AI results with animation
+                              setRemovingItems(prev => new Set(Array.from(prev).concat(index)));
+                              setTimeout(() => {
+                                if (aiResult && Array.isArray(aiResult)) {
+                                  const updatedResults = aiResult.filter((_, itemIndex) => itemIndex !== index);
+                                  if (updatedResults.length === 0) {
+                                    setAiResult(null);
+                                    setSelectedAiItems(new Set());
+                                  } else {
+                                    setAiResult(updatedResults);
+                                    // Update selected items indices
+                                    const newSelectedItems = new Set<number>();
+                                    selectedAiItems.forEach(selectedIndex => {
+                                      if (selectedIndex < index) {
+                                        newSelectedItems.add(selectedIndex);
+                                      } else if (selectedIndex > index) {
+                                        newSelectedItems.add(selectedIndex - 1);
+                                      }
+                                    });
+                                    setSelectedAiItems(newSelectedItems);
+                                  }
+                                }
+                                setRemovingItems(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(index);
+                                  return newSet;
+                                });
+                              }, 300); // 300ms animation duration
                             }}
+                            disabled={removingItems.has(index)}
                             style={{
                               flex: 1,
-                              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                              background: removingItems.has(index) ? 'rgba(59, 130, 246, 0.5)' : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                               color: 'white',
                               border: 'none',
                               padding: '10px 16px',
                               borderRadius: '6px',
                               fontSize: '14px',
                               fontWeight: '600',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
+                              cursor: removingItems.has(index) ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.2s',
+                              opacity: removingItems.has(index) ? 0.6 : 1
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'translateY(-1px)';
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                              if (!removingItems.has(index)) {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                              }
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.transform = 'translateY(0)';
@@ -684,28 +876,57 @@ const MealLogging: React.FC = () => {
                                 await axios.post('/api/meals', mealData);
                                 setMessage(`${food.name} logged successfully!`);
                                 fetchMeals();
+                                
+                                // Remove the logged item from AI results with animation
+                                setRemovingItems(prev => new Set(Array.from(prev).concat(index)));
+                                setTimeout(() => {
+                                  if (aiResult && Array.isArray(aiResult)) {
+                                    const updatedResults = aiResult.filter((_, itemIndex) => itemIndex !== index);
+                                    if (updatedResults.length === 0) {
+                                      setAiResult(null);
+                                      setSelectedAiItems(new Set());
+                                    } else {
+                                      setAiResult(updatedResults);
+                                      // Update selected items indices
+                                      const newSelectedItems = new Set<number>();
+                                      selectedAiItems.forEach(selectedIndex => {
+                                        if (selectedIndex < index) {
+                                          newSelectedItems.add(selectedIndex);
+                                        } else if (selectedIndex > index) {
+                                          newSelectedItems.add(selectedIndex - 1);
+                                        }
+                                      });
+                                      setSelectedAiItems(newSelectedItems);
+                                    }
+                                  }
+                                  setRemovingItems(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(index);
+                                    return newSet;
+                                  });
+                                }, 300); // 300ms animation duration
                               } catch (error: any) {
                                 setMessage('Error logging meal: ' + (error.response?.data?.error || error.message));
                               } finally {
                                 setLoading(false);
                               }
                             }}
-                            disabled={loading}
+                            disabled={loading || removingItems.has(index)}
                             style={{
                               flex: 1,
-                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              background: removingItems.has(index) ? 'rgba(16, 185, 129, 0.5)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                               color: 'white',
                               border: 'none',
                               padding: '10px 16px',
                               borderRadius: '6px',
                               fontSize: '14px',
                               fontWeight: '600',
-                              cursor: loading ? 'not-allowed' : 'pointer',
-                              opacity: loading ? 0.6 : 1,
+                              cursor: (loading || removingItems.has(index)) ? 'not-allowed' : 'pointer',
+                              opacity: (loading || removingItems.has(index)) ? 0.6 : 1,
                               transition: 'all 0.2s'
                             }}
                             onMouseEnter={(e) => {
-                              if (!loading) {
+                              if (!loading && !removingItems.has(index)) {
                                 e.currentTarget.style.transform = 'translateY(-1px)';
                                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
                               }
@@ -728,26 +949,91 @@ const MealLogging: React.FC = () => {
         </div>
 
         <form onSubmit={logMeal}>
-          <div className="form-group">
-            <label className="form-label">Search Food Database</label>
-            <div className="food-search">
+          <div style={{ marginBottom: theme.spacing.lg }}>
+            <label style={{
+              display: 'block',
+              marginBottom: theme.spacing.md,
+              color: theme.colors.primary.text,
+              fontSize: theme.typography.fontSize.body,
+              fontFamily: theme.typography.fontFamily.bold,
+              fontWeight: theme.typography.fontWeight.semiBold
+            }}>
+              Search Food Database
+            </label>
+            <div style={{ position: 'relative' }}>
               <input
                 type="text"
-                className="form-input"
                 value={searchTerm}
                 onChange={handleSearchChange}
                 placeholder="Search for food items..."
+                style={{
+                  width: '100%',
+                  padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+                  borderRadius: theme.borderRadius.lg,
+                  border: `1px solid ${theme.colors.primary.border}`,
+                  background: theme.colors.primary.surface,
+                  color: theme.colors.primary.text,
+                  fontFamily: theme.typography.fontFamily.primary,
+                  fontSize: theme.typography.fontSize.body,
+                  outline: 'none',
+                  transition: 'all 0.3s ease',
+                  boxShadow: theme.shadows.normal.sm
+                }}
+                onFocus={(e) => {
+                  e.target.style.border = `1px solid ${theme.colors.primary.accent}`;
+                  e.target.style.boxShadow = theme.shadows.glow.accent;
+                }}
+                onBlur={(e) => {
+                  e.target.style.border = `1px solid ${theme.colors.primary.border}`;
+                  e.target.style.boxShadow = theme.shadows.normal.sm;
+                }}
               />
               {foodResults.length > 0 && (
-                <div className="food-results">
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: theme.colors.primary.surface,
+                  border: `1px solid ${theme.colors.primary.border}`,
+                  borderRadius: theme.borderRadius.lg,
+                  marginTop: theme.spacing.sm,
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  zIndex: 10,
+                  boxShadow: theme.shadows.normal.lg
+                }}>
                   {foodResults.map(food => (
                     <div
                       key={food.id}
-                      className="food-result-item"
                       onClick={() => selectFood(food)}
+                      style={{
+                        padding: theme.spacing.md,
+                        borderBottom: `1px solid ${theme.colors.primary.border}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        fontFamily: theme.typography.fontFamily.primary
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = theme.colors.primary.accent + '20';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
                     >
-                      <div className="food-name">{food.name}</div>
-                      <div className="food-macros">
+                      <div style={{
+                        color: theme.colors.primary.text,
+                        fontSize: theme.typography.fontSize.body,
+                        fontWeight: theme.typography.fontWeight.medium,
+                        marginBottom: theme.spacing.xs
+                      }}>
+                        {food.name}
+                      </div>
+                      <div style={{
+                        color: theme.colors.primary.textSecondary,
+                        fontSize: theme.typography.fontSize.bodySmall,
+                        fontFamily: theme.typography.fontFamily.primary
+                      }}>
                         {food.calories_per_100g} cal, {food.protein_per_100g}g protein, {food.carbs_per_100g}g carbs, {food.fat_per_100g}g fat per 100g
                       </div>
                     </div>
@@ -758,28 +1044,110 @@ const MealLogging: React.FC = () => {
           </div>
 
           {selectedFood && (
-            <>
-              <div className="grid grid-2">
-                <div className="form-group">
-                  <label className="form-label">Quantity</label>
+            <div style={{
+              background: theme.colors.primary.surface,
+              border: `1px solid ${theme.colors.primary.border}`,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.lg,
+              marginBottom: theme.spacing.lg,
+              boxShadow: theme.shadows.normal.sm
+            }}>
+              <h4 style={{
+                color: theme.colors.primary.text,
+                fontSize: theme.typography.fontSize.body,
+                fontFamily: theme.typography.fontFamily.bold,
+                fontWeight: theme.typography.fontWeight.semiBold,
+                marginBottom: theme.spacing.lg,
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <CheckCircle size={20} style={{ marginRight: theme.spacing.sm, color: theme.colors.primary.accent }} />
+                Selected: {selectedFood.name}
+              </h4>
+              
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: theme.spacing.lg,
+                marginBottom: theme.spacing.lg
+              }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: theme.spacing.sm,
+                    color: theme.colors.primary.text,
+                    fontSize: theme.typography.fontSize.bodySmall,
+                    fontFamily: theme.typography.fontFamily.primary,
+                    fontWeight: theme.typography.fontWeight.medium
+                  }}>
+                    Quantity
+                  </label>
                   <input
                     type="number"
-                    className="form-input"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                     placeholder="100"
                     min="0.1"
                     step="0.1"
                     required
+                    style={{
+                      width: '100%',
+                      padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+                      borderRadius: theme.borderRadius.md,
+                      border: `1px solid ${theme.colors.primary.border}`,
+                      background: theme.colors.primary.background,
+                      color: theme.colors.primary.text,
+                      fontFamily: theme.typography.fontFamily.primary,
+                      fontSize: theme.typography.fontSize.body,
+                      outline: 'none',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.border = `1px solid ${theme.colors.primary.accent}`;
+                      e.target.style.boxShadow = theme.shadows.glow.accent;
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.border = `1px solid ${theme.colors.primary.border}`;
+                      e.target.style.boxShadow = 'none';
+                    }}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Unit</label>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: theme.spacing.sm,
+                    color: theme.colors.primary.text,
+                    fontSize: theme.typography.fontSize.bodySmall,
+                    fontFamily: theme.typography.fontFamily.primary,
+                    fontWeight: theme.typography.fontWeight.medium
+                  }}>
+                    Unit
+                  </label>
                   <select
-                    className="form-select"
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+                      borderRadius: theme.borderRadius.md,
+                      border: `1px solid ${theme.colors.primary.border}`,
+                      background: theme.colors.primary.background,
+                      color: theme.colors.primary.text,
+                      fontFamily: theme.typography.fontFamily.primary,
+                      fontSize: theme.typography.fontSize.body,
+                      outline: 'none',
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.border = `1px solid ${theme.colors.primary.accent}`;
+                      e.target.style.boxShadow = theme.shadows.glow.accent;
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.border = `1px solid ${theme.colors.primary.border}`;
+                      e.target.style.boxShadow = 'none';
+                    }}
                   >
                     <option value="piece">Piece(s)</option>
                     <option value="item">Item(s)</option>
@@ -795,12 +1163,41 @@ const MealLogging: React.FC = () => {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Meal Type</label>
+              <div style={{ marginBottom: theme.spacing.lg }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: theme.spacing.sm,
+                  color: theme.colors.primary.text,
+                  fontSize: theme.typography.fontSize.bodySmall,
+                  fontFamily: theme.typography.fontFamily.primary,
+                  fontWeight: theme.typography.fontWeight.medium
+                }}>
+                  Meal Type
+                </label>
                 <select
-                  className="form-select"
                   value={mealType}
                   onChange={(e) => setMealType(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+                    borderRadius: theme.borderRadius.md,
+                    border: `1px solid ${theme.colors.primary.border}`,
+                    background: theme.colors.primary.background,
+                    color: theme.colors.primary.text,
+                    fontFamily: theme.typography.fontFamily.primary,
+                    fontSize: theme.typography.fontSize.body,
+                    outline: 'none',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.border = `1px solid ${theme.colors.primary.accent}`;
+                    e.target.style.boxShadow = theme.shadows.glow.accent;
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.border = `1px solid ${theme.colors.primary.border}`;
+                    e.target.style.boxShadow = 'none';
+                  }}
                 >
                   <option value="breakfast">Breakfast</option>
                   <option value="lunch">Lunch</option>
@@ -809,10 +1206,56 @@ const MealLogging: React.FC = () => {
                 </select>
               </div>
 
-              <button type="submit" className="btn" disabled={loading}>
-                {loading ? 'Logging...' : 'Log Meal'}
+              <button 
+                type="submit" 
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  background: loading 
+                    ? theme.colors.primary.border 
+                    : theme.gradients.accent,
+                  color: theme.colors.primary.text,
+                  border: 'none',
+                  padding: `${theme.spacing.md} ${theme.spacing.xl}`,
+                  borderRadius: theme.borderRadius.lg,
+                  fontSize: theme.typography.fontSize.body,
+                  fontWeight: theme.typography.fontWeight.bold,
+                  fontFamily: theme.typography.fontFamily.primary,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: loading ? 'none' : theme.shadows.glow.accent,
+                  opacity: loading ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: theme.spacing.sm
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 12px 35px rgba(0, 255, 127, 0.4)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!loading) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = theme.shadows.glow.accent;
+                  }
+                }}
+              >
+                {loading ? (
+                  <>
+                    <Loader size={16} className="animate-spin" />
+                    Logging...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={16} />
+                    Log Meal
+                  </>
+                )}
               </button>
-            </>
+            </div>
           )}
         </form>
       </div>

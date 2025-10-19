@@ -1,0 +1,315 @@
+/* GymFreak App - Global Theme Styles */
+
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap');
+
+/* CSS Variables for theme */
+:root {
+  /* Dark Mode Colors */
+  --color-primary-bg: #0E0E0F;
+  --color-surface: #1A1A1C;
+  --color-accent: #00FF7F;
+  --color-accent-secondary: #0077FF;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #B5B5B8;
+  --color-error: #FF3B30;
+  --color-border: #2A2A2D;
+  --color-border-light: #2B2B2D;
+  --color-inactive: #5B5B5B;
+  --color-nav-bg: #121214;
+
+  /* Gradients */
+  --gradient-accent: linear-gradient(90deg, #00FF7F, #00BFA6);
+  --gradient-background: linear-gradient(180deg, #0E0E0F, #1A1A1C);
+  --gradient-card-hover: linear-gradient(135deg, #1A1A1C, #2A2A2D);
+
+  /* Typography */
+  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-bold: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 50%;
+
+  /* Shadows */
+  --shadow-glow-accent: 0 0 20px rgba(0, 255, 127, 0.3);
+  --shadow-glow-blue: 0 0 20px rgba(0, 119, 255, 0.3);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-normal-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-normal-md: 0 4px 16px rgba(0, 0, 0, 0.2);
+  --shadow-normal-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Global Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-primary);
+  background: var(--color-primary-bg);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00BFA6;
+}
+
+/* Keyframe Animations */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes glow {
+  from { box-shadow: 0 0 20px rgba(0, 255, 127, 0.3); }
+  to { box-shadow: 0 0 30px rgba(0, 255, 127, 0.6); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Utility Classes */
+.glow-accent {
+  box-shadow: var(--shadow-glow-accent);
+}
+
+.glow-blue {
+  box-shadow: var(--shadow-glow-blue);
+}
+
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 127, 0.2), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.glow-animation {
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+/* Button Styles */
+.btn-primary {
+  background: var(--gradient-accent);
+  color: var(--color-text-primary);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--font-primary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(0, 255, 127, 0.2);
+}
+
+.btn-primary:hover {
+  box-shadow: var(--shadow-glow-accent);
+  transform: translateY(-2px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 0 30px rgba(0, 255, 127, 0.8);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-accent);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--font-primary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(0, 255, 127, 0.1);
+  box-shadow: var(--shadow-glow-accent);
+}
+
+/* Card Styles */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 20px rgba(0, 255, 127, 0.1);
+}
+
+/* Input Styles */
+.input {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-family: var(--font-primary);
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(0, 255, 127, 0.1);
+}
+
+.input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+/* Text Styles */
+.text-title {
+  font-family: var(--font-bold);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.text-subtitle {
+  font-family: var(--font-bold);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.text-body {
+  font-family: var(--font-primary);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--color-text-primary);
+}
+
+.text-body-small {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.text-caption {
+  font-family: var(--font-primary);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+/* Progress Ring Styles */
+.progress-ring {
+  filter: drop-shadow(0 0 10px rgba(0, 255, 127, 0.5));
+}
+
+/* Navigation Styles */
+.nav-bar {
+  background: var(--color-nav-bg);
+  border-radius: 20px 20px 0 0;
+}
+
+.nav-item-active {
+  color: var(--color-accent);
+}
+
+.nav-item-inactive {
+  color: var(--color-inactive);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .text-title {
+    font-size: 22px;
+  }
+  
+  .text-subtitle {
+    font-size: 18px;
+  }
+  
+  .card {
+    padding: 16px;
+  }
+  
+  .btn-primary,
+  .btn-secondary {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+}

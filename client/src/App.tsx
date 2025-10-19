@@ -11,6 +11,7 @@ import DietPlanning from './components/DietPlanning';
 import Navigation from './components/Navigation';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './App.css';
+import './theme.css';
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
