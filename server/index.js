@@ -25,19 +25,28 @@ app.use(bodyParser.json({ limit: '50mb' })); // Increase limit for image data
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Database setup
+const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+
+if (!databaseUrl) {
+  console.error('No database URL found. Please set DATABASE_URL or POSTGRES_URL environment variable.');
+  process.exit(1);
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
+  connectionString: databaseUrl,
+  ssl: databaseUrl.includes('neon') || databaseUrl.includes('postgres') ? {
     rejectUnauthorized: false
-  }
+  } : false
 });
 
 // Test database connection
 pool.connect((err, client, release) => {
   if (err) {
     console.error('Error connecting to database:', err);
+    console.log('Database URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
+    console.log('Postgres URL:', process.env.POSTGRES_URL ? 'Set' : 'Not set');
   } else {
-    console.log('Connected to Neon PostgreSQL database');
+    console.log('Connected to PostgreSQL database');
     release();
   }
 });
@@ -1793,6 +1802,15 @@ Return ONLY the JSON object with the foods array.`
 // Serve static files from React build
 app.use(express.static(path.join(__dirname, '../client/build')));
 
+// Health check endpoint for Railway
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    database: databaseUrl ? 'Connected' : 'Not configured'
+  });
+});
+
 // Handle React routing, return all requests to React app
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
@@ -1800,4 +1818,9 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log('Environment variables:');
+  console.log('- DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
+  console.log('- POSTGRES_URL:', process.env.POSTGRES_URL ? 'Set' : 'Not set');
+  console.log('- OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Set' : 'Not set');
+  console.log('- JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'Not set');
 });
