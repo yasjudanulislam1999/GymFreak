@@ -29,7 +29,9 @@ const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 
 if (!databaseUrl) {
   console.error('No database URL found. Please set DATABASE_URL or POSTGRES_URL environment variable.');
-  process.exit(1);
+  console.error('Available environment variables:', Object.keys(process.env).filter(key => key.includes('DATABASE') || key.includes('POSTGRES')));
+  console.error('Starting server without database connection...');
+  // Don't exit, let the server start and show the health check error
 }
 
 const pool = new Pool({
@@ -1802,12 +1804,26 @@ Return ONLY the JSON object with the foods array.`
 // Serve static files from React build
 app.use(express.static(path.join(__dirname, '../client/build')));
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'GymFreak API Server is running!',
+    timestamp: new Date().toISOString(),
+    status: 'OK'
+  });
+});
+
 // Health check endpoint for Railway
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    database: databaseUrl ? 'Connected' : 'Not configured'
+    database: databaseUrl ? 'Configured' : 'Not configured',
+    environment: {
+      DATABASE_URL: process.env.DATABASE_URL ? 'Set' : 'Not set',
+      POSTGRES_URL: process.env.POSTGRES_URL ? 'Set' : 'Not set',
+      NODE_ENV: process.env.NODE_ENV || 'development'
+    }
   });
 });
 
