@@ -9,9 +9,10 @@
     "server": "cd server && npm start",
     "client": "cd client && npm start",
     "build": "cd client && npm install && npm run build && cd ../server && npm install",
+    "build:prod": "cd client && npm ci && npm run build && cd ../server && npm ci",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install",
     "stop": "pkill -f 'node.*index.js' && pkill -f 'react-scripts'",
-    "start:prod": "NODE_PATH=./node_modules node server/index.js"
+    "start:prod": "cd server && npm start"
   },
   "keywords": [
     "gym",
