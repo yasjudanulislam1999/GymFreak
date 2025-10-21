@@ -28,34 +28,49 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 // Database setup
 const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 
+let pool = null;
+
 if (!databaseUrl) {
   console.error('No database URL found. Please set DATABASE_URL or POSTGRES_URL environment variable.');
   console.error('Available environment variables:', Object.keys(process.env).filter(key => key.includes('DATABASE') || key.includes('POSTGRES')));
   console.error('Starting server without database connection...');
-  // Don't exit, let the server start and show the health check error
+} else {
+  pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: databaseUrl.includes('neon') || databaseUrl.includes('postgres') ? {
+      rejectUnauthorized: false
+    } : false
+  });
+
+  // Test database connection
+  pool.connect((err, client, release) => {
+    if (err) {
+      console.error('Error connecting to database:', err);
+      console.log('Database URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
+      console.log('Postgres URL:', process.env.POSTGRES_URL ? 'Set' : 'Not set');
+    } else {
+      console.log('Connected to PostgreSQL database');
+      release();
+    }
+  });
 }
 
-const pool = new Pool({
-  connectionString: databaseUrl,
-  ssl: databaseUrl.includes('neon') || databaseUrl.includes('postgres') ? {
-    rejectUnauthorized: false
-  } : false
-});
-
-// Test database connection
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('Error connecting to database:', err);
-    console.log('Database URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
-    console.log('Postgres URL:', process.env.POSTGRES_URL ? 'Set' : 'Not set');
-  } else {
-    console.log('Connected to PostgreSQL database');
-    release();
+// Helper function to check database connection
+const checkDatabaseConnection = (res) => {
+  if (!pool) {
+    res.status(503).json({ error: 'Database not connected. Please set DATABASE_URL or POSTGRES_URL environment variable.' });
+    return false;
   }
-});
+  return true;
+};
 
 // Initialize database tables
 const initializeDatabase = async () => {
+  if (!pool) {
+    console.log('Skipping database initialization - no database connection');
+    return;
+  }
+  
   try {
     // Users table
     await pool.query(`
@@ -1024,6 +1039,8 @@ const authenticateToken = (req, res, next) => {
 // Register
 app.post('/api/register', async (req, res) => {
   try {
+    if (!checkDatabaseConnection(res)) return;
+    
     const { email, password, name, height, weight, age, gender, activityLevel } = req.body;
 
     if (!email || !password || !name) {
@@ -1061,6 +1078,8 @@ app.post('/api/register', async (req, res) => {
 // Login
 app.post('/api/login', async (req, res) => {
   try {
+    if (!checkDatabaseConnection(res)) return;
+    
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -1818,11 +1837,13 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    database: databaseUrl ? 'Configured' : 'Not configured',
+    database: pool ? 'Connected' : 'Not connected',
+    databaseUrl: databaseUrl ? 'Configured' : 'Not configured',
     environment: {
       DATABASE_URL: process.env.DATABASE_URL ? 'Set' : 'Not set',
       POSTGRES_URL: process.env.POSTGRES_URL ? 'Set' : 'Not set',
-      NODE_ENV: process.env.NODE_ENV || 'development'
+      NODE_ENV: process.env.NODE_ENV || 'development',
+      PORT: PORT
     }
   });
 });
