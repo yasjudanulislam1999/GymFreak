@@ -3,7 +3,7 @@ import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Calendar, TrendingUp, Target, Flame } from 'lucide-react';
 
-interface NutritionSummary {
+interface NutritionData {
   date: string;
   total_calories: number;
   total_protein: number;
@@ -11,12 +11,12 @@ interface NutritionSummary {
   total_fat: number;
 }
 
-interface TDEE {
-  tdee: number;
-}
+// interface TDEE {
+//   tdee: number;
+// }
 
 const NutritionSummary: React.FC = () => {
-  const [nutritionData, setNutritionData] = useState<NutritionSummary | null>(null);
+  const [nutritionData, setNutritionData] = useState<NutritionData | null>(null);
   const [tdee, setTdee] = useState<number>(0);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);

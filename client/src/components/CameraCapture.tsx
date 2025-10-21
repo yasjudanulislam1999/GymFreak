@@ -14,6 +14,37 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const startCamera = async () => {
+    try {
+      console.log('🎥 Starting camera...');
+      setIsLoading(true);
+      setError(null);
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'environment'
+        }
+      });
+
+      console.log('📹 Camera stream obtained:', mediaStream);
+      setStream(mediaStream);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('❌ Camera error:', error);
+      setError('Camera not available. Please check permissions or use text input instead.');
+      setIsLoading(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+  };
+
   // Start camera when component mounts
   useEffect(() => {
     startCamera();
@@ -31,7 +62,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
       clearTimeout(timeout);
       stopCamera();
     };
-  }, []);
+  }, [isLoading, stopCamera, stream]);
 
   // Handle video element setup when stream is available
   useEffect(() => {
@@ -82,72 +113,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
     }
   }, [stream]);
 
-  const startCamera = async () => {
-    try {
-      console.log('🎥 Starting camera...');
-      setIsLoading(true);
-      setError(null);
-
-      // Check if getUserMedia is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera not supported on this device');
-      }
-
-      // Request camera access with fallback constraints
-      let mediaStream;
-      try {
-        // Try back camera first
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }
-        });
-      } catch (backCameraError) {
-        console.log('🔄 Back camera failed, trying front camera...');
-        // Fallback to front camera
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }
-        });
-      }
-
-      console.log('✅ Camera stream obtained', {
-        stream: !!mediaStream,
-        tracks: mediaStream.getTracks().length,
-        videoTrack: mediaStream.getVideoTracks()[0]?.label
-      });
-      
-      setStream(mediaStream);
-      setIsLoading(false); // Stop loading immediately when stream is obtained
-
-    } catch (err: any) {
-      console.error('❌ Camera error:', err);
-      let errorMessage = 'Camera access denied or not available. Please use text input instead.';
-      
-      if (err.name === 'NotAllowedError') {
-        errorMessage = 'Camera permission denied. Please allow camera access and try again.';
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'No camera found on this device. Please use text input instead.';
-      } else if (err.name === 'NotSupportedError') {
-        errorMessage = 'Camera not supported on this device. Please use text input instead.';
-      }
-      
-      setError(errorMessage);
-      setIsLoading(false);
-    }
-  };
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-  };
 
   const captureImage = () => {
     if (videoRef.current && canvasRef.current) {

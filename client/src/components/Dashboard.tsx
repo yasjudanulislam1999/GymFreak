@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
-import { Flame, Target, TrendingUp, Calendar, Bot, Utensils } from 'lucide-react';
+import { Flame, Target, TrendingUp, Bot, Utensils } from 'lucide-react';
 import theme from '../theme';
 
-interface TDEE {
-  tdee: number;
-}
+// interface TDEE {
+//   tdee: number;
+// }
 
 interface NutritionSummary {
   date: string;

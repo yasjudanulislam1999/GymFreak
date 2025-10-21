@@ -23,16 +23,6 @@ const AICoach: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  useEffect(() => {
-    // Load chat history and nutrition data when component mounts
-    loadChatHistory();
-    loadNutritionData();
-  }, [user?.id]);
-
   const loadNutritionData = async () => {
     try {
       const response = await axios.get('/api/ai/nutrition-summary');
@@ -79,6 +69,16 @@ const AICoach: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    // Load chat history and nutrition data when component mounts
+    loadChatHistory();
+    loadNutritionData();
+  }, [user?.id, loadChatHistory, loadNutritionData]);
+
   const saveMessage = async (message: Message) => {
     try {
       await axios.post('/api/chat/messages', {
@@ -118,7 +118,7 @@ const AICoach: React.FC = () => {
     const consumedCalories = nutritionData?.consumed?.calories || 0;
     const remainingCalories = nutritionData?.remaining?.calories || 0;
     const consumedProtein = nutritionData?.consumed?.protein || 0;
-    const remainingProtein = nutritionData?.remaining?.protein || 0;
+    // const remainingProtein = nutritionData?.remaining?.protein || 0;
     const progressCalories = nutritionData?.progress?.calories || 0;
     
     const userName = user?.name || 'there';
@@ -256,24 +256,24 @@ const AICoach: React.FC = () => {
     return `I'm here to help with your nutrition and fitness goals! I can assist with meal planning, calorie targets, protein needs, weight management, and general nutrition advice. Complete your profile for personalized recommendations!`;
   };
 
-  const calculateTDEE = (height: number, weight: number, age: number, gender: string, activityLevel: string): number => {
-    let bmr;
-    if (gender.toLowerCase() === 'male') {
-      bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
-    } else {
-      bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
-    }
+  // const calculateTDEE = (height: number, weight: number, age: number, gender: string, activityLevel: string): number => {
+  //   let bmr;
+  //   if (gender.toLowerCase() === 'male') {
+  //     bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+  //   } else {
+  //     bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
+  //   }
 
-    const activityMultipliers = {
-      'sedentary': 1.2,
-      'light': 1.375,
-      'moderate': 1.55,
-      'active': 1.725,
-      'very_active': 1.9
-    };
+  //   const activityMultipliers = {
+  //     'sedentary': 1.2,
+  //     'light': 1.375,
+  //     'moderate': 1.55,
+  //     'active': 1.725,
+  //     'very_active': 1.9
+  //   };
 
-    return Math.round(bmr * (activityMultipliers[activityLevel as keyof typeof activityMultipliers] || 1.2));
-  };
+  //   return Math.round(bmr * (activityMultipliers[activityLevel as keyof typeof activityMultipliers] || 1.2));
+  // };
 
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;

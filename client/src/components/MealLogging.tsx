@@ -167,9 +167,9 @@ const MealLogging: React.FC = () => {
     }
   };
 
-  const handleFoodItemClick = (foodIndex: number) => {
-    selectAIResult(foodIndex);
-  };
+  // const handleFoodItemClick = (foodIndex: number) => {
+  //   selectAIResult(foodIndex);
+  // };
 
   const clearAIResults = () => {
     setAiResult(null);
