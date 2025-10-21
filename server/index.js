@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -1801,15 +1802,14 @@ Return ONLY the JSON object with the foods array.`
   }
 });
 
-// Serve static files from React build
-app.use(express.static(path.join(__dirname, '../client/build')));
-
-// Root endpoint
+// Root endpoint - must be before static file serving
 app.get('/', (req, res) => {
   res.json({ 
     message: 'GymFreak API Server is running!',
     timestamp: new Date().toISOString(),
-    status: 'OK'
+    status: 'OK',
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
@@ -1827,16 +1827,49 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Handle React routing, return all requests to React app
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-});
+// Serve static files from React build (try multiple possible locations)
+const staticPaths = [
+  path.join(__dirname, '../client/build'),
+  path.join(__dirname, './client/build'),
+  path.join(__dirname, 'client/build'),
+  path.join(process.cwd(), 'client/build'),
+  path.join(process.cwd(), 'build')
+];
 
-app.listen(PORT, () => {
+let staticPath = null;
+for (const staticPathOption of staticPaths) {
+  if (fs.existsSync(staticPathOption)) {
+    staticPath = staticPathOption;
+    console.log(`Found static files at: ${staticPathOption}`);
+    break;
+  }
+}
+
+if (staticPath) {
+  app.use(express.static(staticPath));
+  console.log(`Serving static files from: ${staticPath}`);
+} else {
+  console.log('Static files not found, serving API only');
+  console.log('Checked paths:', staticPaths);
+}
+
+// Handle React routing, return all requests to React app (only if static files exist)
+if (staticPath) {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(staticPath, 'index.html'));
+  });
+}
+
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log('Environment variables:');
   console.log('- DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
   console.log('- POSTGRES_URL:', process.env.POSTGRES_URL ? 'Set' : 'Not set');
   console.log('- OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Set' : 'Not set');
   console.log('- JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'Not set');
+  console.log('- NODE_ENV:', process.env.NODE_ENV || 'development');
+  console.log('Server is ready to accept connections!');
+}).on('error', (err) => {
+  console.error('Server startup error:', err);
+  process.exit(1);
 });
