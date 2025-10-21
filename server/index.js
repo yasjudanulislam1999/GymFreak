@@ -34,6 +34,7 @@ if (!databaseUrl) {
   console.error('No database URL found. Please set DATABASE_URL or POSTGRES_URL environment variable.');
   console.error('Available environment variables:', Object.keys(process.env).filter(key => key.includes('DATABASE') || key.includes('POSTGRES')));
   console.error('Starting server without database connection...');
+  console.log('Server will start in API-only mode without database functionality');
 } else {
   pool = new Pool({
     connectionString: databaseUrl,
@@ -1828,14 +1829,20 @@ Return ONLY the JSON object with the foods array.`
 
 // Root endpoint - must be before static file serving
 app.get('/', (req, res) => {
-  console.log('Root endpoint hit - server is responding');
+  console.log('✅ Root endpoint hit - server is responding');
+  console.log('✅ Request headers:', req.headers);
+  console.log('✅ Request method:', req.method);
+  console.log('✅ Request URL:', req.url);
+  
   res.json({ 
     message: 'GymFreak API Server is running!',
     timestamp: new Date().toISOString(),
     status: 'OK',
     port: PORT,
     environment: process.env.NODE_ENV || 'development',
-    database: pool ? 'Connected' : 'Not connected'
+    database: pool ? 'Connected' : 'Not connected',
+    staticFiles: staticPath ? 'Found' : 'Not found',
+    serverUptime: process.uptime()
   });
 });
 
@@ -1893,16 +1900,25 @@ if (staticPath) {
   });
 }
 
+console.log('Starting server...');
+console.log('Port:', PORT);
+console.log('Database URL available:', !!databaseUrl);
+console.log('Pool initialized:', !!pool);
+
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
   console.log('Environment variables:');
   console.log('- DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
   console.log('- POSTGRES_URL:', process.env.POSTGRES_URL ? 'Set' : 'Not set');
   console.log('- OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Set' : 'Not set');
   console.log('- JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'Not set');
   console.log('- NODE_ENV:', process.env.NODE_ENV || 'development');
-  console.log('Server is ready to accept connections!');
+  console.log('✅ Server is ready to accept connections!');
+  console.log('✅ Health check endpoint available at: /');
+  console.log('✅ API health check available at: /api/health');
 }).on('error', (err) => {
-  console.error('Server startup error:', err);
+  console.error('❌ Server startup error:', err);
+  console.error('❌ Error details:', err.message);
+  console.error('❌ Error code:', err.code);
   process.exit(1);
 });
