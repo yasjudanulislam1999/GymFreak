@@ -162,7 +162,12 @@ const initializeDatabase = async () => {
 };
 
 // Initialize database on startup
-initializeDatabase();
+console.log('Starting database initialization...');
+initializeDatabase().then(() => {
+  console.log('Database initialization completed');
+}).catch((error) => {
+  console.error('Database initialization failed:', error);
+});
 
 // TDEE calculation function
 function calculateTDEE(height, weight, age, gender, activityLevel) {
@@ -1823,17 +1828,20 @@ Return ONLY the JSON object with the foods array.`
 
 // Root endpoint - must be before static file serving
 app.get('/', (req, res) => {
+  console.log('Root endpoint hit - server is responding');
   res.json({ 
     message: 'GymFreak API Server is running!',
     timestamp: new Date().toISOString(),
     status: 'OK',
     port: PORT,
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    database: pool ? 'Connected' : 'Not connected'
   });
 });
 
 // Health check endpoint for Railway
 app.get('/api/health', (req, res) => {
+  console.log('Health check endpoint hit');
   res.status(200).json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
@@ -1858,11 +1866,15 @@ const staticPaths = [
 ];
 
 let staticPath = null;
+console.log('Checking for static files...');
 for (const staticPathOption of staticPaths) {
+  console.log(`Checking path: ${staticPathOption}`);
   if (fs.existsSync(staticPathOption)) {
     staticPath = staticPathOption;
     console.log(`Found static files at: ${staticPathOption}`);
     break;
+  } else {
+    console.log(`Path does not exist: ${staticPathOption}`);
   }
 }
 
