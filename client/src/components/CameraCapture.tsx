@@ -20,6 +20,16 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
       setIsLoading(true);
       setError(null);
 
+      // Check if running on HTTPS (required for camera access)
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        throw new Error('Camera requires HTTPS connection');
+      }
+
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera not supported in this browser');
+      }
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280 },
@@ -31,9 +41,21 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
       console.log('📹 Camera stream obtained:', mediaStream);
       setStream(mediaStream);
       setIsLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Camera error:', error);
-      setError('Camera not available. Please check permissions or use text input instead.');
+      let errorMessage = 'Camera not available. Please check permissions or use text input instead.';
+      
+      if (error.message === 'Camera requires HTTPS connection') {
+        errorMessage = 'Camera requires HTTPS connection. Please use the app over HTTPS or use text input instead.';
+      } else if (error.name === 'NotAllowedError') {
+        errorMessage = 'Camera access denied. Please allow camera access and try again.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = 'No camera found. Please use text input instead.';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage = 'Camera not supported in this browser. Please use text input instead.';
+      }
+      
+      setError(errorMessage);
       setIsLoading(false);
     }
   };
@@ -47,31 +69,35 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
 
   // Start camera when component mounts
   useEffect(() => {
-    startCamera();
+    let timeout: NodeJS.Timeout;
     
-    // Add timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      if (isLoading && !stream) {
-        console.log('⏰ Camera loading timeout');
-        setError('Camera is taking too long to load. Please try again or use text input instead.');
-        setIsLoading(false);
-      }
-    }, 10000); // 10 second timeout
+    const initializeCamera = async () => {
+      await startCamera();
+      
+      // Add timeout to prevent infinite loading
+      timeout = setTimeout(() => {
+        if (isLoading && !stream) {
+          console.log('⏰ Camera loading timeout');
+          setError('Camera is taking too long to load. Please try again or use text input instead.');
+          setIsLoading(false);
+        }
+      }, 10000); // 10 second timeout
+    };
+    
+    initializeCamera();
     
     return () => {
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
       stopCamera();
     };
-  }, [isLoading, stopCamera, stream]);
+  }, []); // Empty dependency array - only run once on mount
 
   // Handle video element setup when stream is available
   useEffect(() => {
     if (stream && videoRef.current) {
       console.log('📹 Setting up video element...', {
         stream: !!stream,
-        videoElement: !!videoRef.current,
-        videoWidth: videoRef.current.videoWidth,
-        videoHeight: videoRef.current.videoHeight
+        videoElement: !!videoRef.current
       });
       
       const video = videoRef.current;
@@ -80,34 +106,57 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
       video.muted = true;
       video.playsInline = true;
       video.autoplay = true;
+      video.controls = false;
       
       // Set the stream
       video.srcObject = stream;
       
       // Add event listeners for debugging
-      video.addEventListener('loadedmetadata', () => {
+      const handleLoadedMetadata = () => {
         console.log('📹 Video metadata loaded', {
           videoWidth: video.videoWidth,
           videoHeight: video.videoHeight
         });
-      });
+      };
       
-      video.addEventListener('canplay', () => {
+      const handleCanPlay = () => {
         console.log('📹 Video can play');
-      });
+        setIsLoading(false);
+      };
       
-      video.addEventListener('error', (e) => {
+      const handleError = (e: Event) => {
         console.error('❌ Video error event:', e);
         setError('Video failed to load. Please try again.');
-      });
+        setIsLoading(false);
+      };
+      
+      const handlePlay = () => {
+        console.log('✅ Video started playing');
+        setIsLoading(false);
+      };
+      
+      video.addEventListener('loadedmetadata', handleLoadedMetadata);
+      video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener('error', handleError);
+      video.addEventListener('play', handlePlay);
       
       // Play the video
       video.play().then(() => {
         console.log('✅ Video started playing');
+        setIsLoading(false);
       }).catch(err => {
         console.error('❌ Video play error:', err);
         setError('Failed to start video. Please try again.');
+        setIsLoading(false);
       });
+      
+      // Cleanup function
+      return () => {
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('error', handleError);
+        video.removeEventListener('play', handlePlay);
+      };
     } else if (stream && !videoRef.current) {
       console.log('⚠️ Stream available but video element not ready yet');
     }
@@ -232,10 +281,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
               <h4 style={{ margin: '0 0 8px 0', color: '#dc2626' }}>Camera Error</h4>
               <p style={{ margin: '0 0 16px 0', color: '#6b7280', fontSize: '14px' }}>{error}</p>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setError(null);
                   setIsLoading(true);
-                  startCamera();
+                  await startCamera();
                 }}
                 style={{
                   background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
@@ -334,6 +383,21 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
               <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: '#6b7280' }}>
                 Please allow camera access when prompted
               </p>
+              <button
+                onClick={onClose}
+                style={{
+                  background: 'transparent',
+                  color: '#6b7280',
+                  border: '1px solid #d1d5db',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  marginTop: '12px'
+                }}
+              >
+                Cancel
+              </button>
             </div>
           ) : (
             <div style={{ textAlign: 'center' }}>
