@@ -21,7 +21,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCapture, onClose }
       setError(null);
 
       // Check if running on HTTPS (required for camera access)
-      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
         throw new Error('Camera requires HTTPS connection');
       }
 
