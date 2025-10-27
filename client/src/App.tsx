@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
 import Register from './components/Register';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
 import MealLogging from './components/MealLogging';
@@ -39,6 +41,14 @@ const AppContent: React.FC = () => {
             <Route 
               path="/register" 
               element={user ? <Navigate to="/dashboard" /> : <Register />} 
+            />
+            <Route 
+              path="/forgot-password" 
+              element={user ? <Navigate to="/dashboard" /> : <ForgotPassword />} 
+            />
+            <Route 
+              path="/reset-password/:token" 
+              element={user ? <Navigate to="/dashboard" /> : <ResetPassword />} 
             />
             <Route 
               path="/dashboard" 

@@ -89,6 +89,19 @@ const initializeDatabase = async () => {
       )
     `);
 
+    // Password reset tokens table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     // Meals table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS meals (
@@ -1123,6 +1136,121 @@ app.post('/api/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Forgot password - generate reset token
+app.post('/api/forgot-password', async (req, res) => {
+  try {
+    if (!checkDatabaseConnection(res)) return;
+    
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Check if user exists
+    const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = userResult.rows[0];
+
+    // Don't reveal if user exists or not (security best practice)
+    if (!user) {
+      return res.status(200).json({ 
+        message: 'If that email exists, a password reset link has been sent.' 
+      });
+    }
+
+    // Generate reset token
+    const resetToken = uuidv4();
+    const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Save reset token
+    await pool.query(`
+      INSERT INTO password_reset_tokens (id, user_id, token, expires_at)
+      VALUES ($1, $2, $3, $4)
+    `, [uuidv4(), user.id, resetToken, expiresAt]);
+
+    // In production, you would send an email here with the reset link
+    // For now, we'll just return the token in the response (you should remove this in production)
+    console.log('Password reset token:', resetToken);
+
+    res.status(200).json({ 
+      message: 'If that email exists, a password reset link has been sent.',
+      resetToken: resetToken // Remove this in production!
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Failed to process password reset request' });
+  }
+});
+
+// Verify reset token
+app.get('/api/verify-reset-token/:token', async (req, res) => {
+  try {
+    if (!checkDatabaseConnection(res)) return;
+    
+    const { token } = req.params;
+
+    const result = await pool.query(
+      `SELECT * FROM password_reset_tokens 
+       WHERE token = $1 AND used = FALSE AND expires_at > NOW()`,
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    res.status(200).json({ message: 'Token is valid' });
+  } catch (error) {
+    console.error('Verify reset token error:', error);
+    res.status(500).json({ error: 'Failed to verify reset token' });
+  }
+});
+
+// Reset password
+app.post('/api/reset-password', async (req, res) => {
+  try {
+    if (!checkDatabaseConnection(res)) return;
+    
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
+    // Check if token is valid
+    const tokenResult = await pool.query(
+      `SELECT * FROM password_reset_tokens 
+       WHERE token = $1 AND used = FALSE AND expires_at > NOW()`,
+      [token]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    const resetToken = tokenResult.rows[0];
+    const userId = resetToken.user_id;
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user's password
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+
+    // Mark token as used
+    await pool.query('UPDATE password_reset_tokens SET used = TRUE WHERE id = $1', [resetToken.id]);
+
+    res.status(200).json({ message: 'Password reset successful' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 
