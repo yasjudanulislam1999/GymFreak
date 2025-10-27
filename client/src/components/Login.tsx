@@ -66,19 +66,33 @@ const Login: React.FC = () => {
             />
           </div>
 
-          <div style={{ textAlign: 'right', marginBottom: '20px' }}>
-            <Link 
-              to="/forgot-password" 
-              style={{ 
-                color: '#00FF7F', 
-                textDecoration: 'none', 
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              Forgot password?
-            </Link>
-          </div>
+          <button 
+            type="button"
+            onClick={() => window.location.href = '/forgot-password'}
+            style={{ 
+              width: '100%',
+              background: 'transparent',
+              border: '1px solid rgba(0, 255, 127, 0.3)',
+              color: '#00FF7F',
+              padding: '12px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              marginBottom: '16px',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 127, 0.1)';
+              e.currentTarget.style.borderColor = 'rgba(0, 255, 127, 0.5)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.borderColor = 'rgba(0, 255, 127, 0.3)';
+            }}
+          >
+            Forgot password?
+          </button>
 
           <button 
             type="submit" 
