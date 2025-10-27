@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
 const OpenAI = require('openai');
+const mailjet = require('node-mailjet');
 require('dotenv').config();
 
 const app = express();
@@ -19,6 +20,64 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key-here'
 });
+
+// Mailjet configuration
+const mailjetClient = mailjet.apiConnect(
+  process.env.MAILJET_API_KEY || '',
+  process.env.MAILJET_API_SECRET || ''
+);
+
+// Helper function to send password reset email
+const sendPasswordResetEmail = async (email, resetToken) => {
+  try {
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+    
+    const request = await mailjetClient
+      .post('send', { version: 'v3.1' })
+      .request({
+        Messages: [
+          {
+            From: {
+              Email: process.env.MAILJET_FROM_EMAIL || 'your-email@yourdomain.com',
+              Name: 'GymFreak'
+            },
+            To: [
+              {
+                Email: email,
+                Name: 'User'
+              }
+            ],
+            Subject: 'Reset Your GymFreak Password',
+            HTMLPart: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #00FF7F;">Reset Your Password</h2>
+                <p>Hello,</p>
+                <p>You requested to reset your password for your GymFreak account. Click the button below to reset your password:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${resetLink}" 
+                     style="background-color: #00FF7F; color: #0E0E0F; padding: 12px 30px; 
+                            text-decoration: none; border-radius: 8px; font-weight: bold; 
+                            display: inline-block;">
+                    Reset Password
+                  </a>
+                </div>
+                <p>This link will expire in 1 hour.</p>
+                <p>If you didn't request this password reset, please ignore this email.</p>
+                <p>Best regards,<br>The GymFreak Team</p>
+              </div>
+            `,
+            TextPart: `Reset your GymFreak password by clicking this link: ${resetLink}. This link will expire in 1 hour.`
+          }
+        ]
+      });
+    
+    console.log('Password reset email sent successfully');
+    return { success: true, messageId: request.body.Messages[0].To[0].MessageID };
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
+    throw error;
+  }
+};
 
 // Middleware
 app.use(cors());
@@ -1171,13 +1230,17 @@ app.post('/api/forgot-password', async (req, res) => {
       VALUES ($1, $2, $3, $4)
     `, [uuidv4(), user.id, resetToken, expiresAt]);
 
-    // In production, you would send an email here with the reset link
-    // For now, we'll just return the token in the response (you should remove this in production)
-    console.log('Password reset token:', resetToken);
+    // Send password reset email using Mailjet
+    try {
+      await sendPasswordResetEmail(user.email, resetToken);
+      console.log('Password reset email sent to:', user.email);
+    } catch (emailError) {
+      console.error('Failed to send password reset email:', emailError);
+      // Still return success to user for security (don't reveal email failure)
+    }
 
     res.status(200).json({ 
-      message: 'If that email exists, a password reset link has been sent.',
-      resetToken: resetToken // Remove this in production!
+      message: 'If that email exists, a password reset link has been sent.'
     });
   } catch (error) {
     console.error('Forgot password error:', error);
