@@ -30,6 +30,12 @@ const mailjetClient = mailjet.apiConnect(
 // Helper function to send password reset email
 const sendPasswordResetEmail = async (email, resetToken) => {
   try {
+    // Check if Mailjet credentials are configured
+    if (!process.env.MAILJET_API_KEY || !process.env.MAILJET_API_SECRET) {
+      console.warn('⚠️ Mailjet credentials not configured. Skipping email send.');
+      return { success: false, skipped: true };
+    }
+
     const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
     
     const request = await mailjetClient
@@ -75,6 +81,12 @@ const sendPasswordResetEmail = async (email, resetToken) => {
     return { success: true, messageId: request.body.Messages[0].To[0].MessageID };
   } catch (error) {
     console.error('Error sending password reset email:', error);
+    console.error('Error details:', {
+      message: error.message,
+      statusCode: error.statusCode,
+      statusText: error.statusText,
+      errorInfo: error.ErrorInfo
+    });
     throw error;
   }
 };
@@ -1232,11 +1244,15 @@ app.post('/api/forgot-password', async (req, res) => {
 
     // Send password reset email using Mailjet
     try {
-      await sendPasswordResetEmail(user.email, resetToken);
-      console.log('Password reset email sent to:', user.email);
+      const emailResult = await sendPasswordResetEmail(user.email, resetToken);
+      if (emailResult.skipped) {
+        console.warn('⚠️ Email not sent - credentials not configured');
+      } else {
+        console.log('✅ Password reset email sent to:', user.email);
+      }
     } catch (emailError) {
-      console.error('Failed to send password reset email:', emailError);
-      // Still return success to user for security (don't reveal email failure)
+      console.error('❌ Failed to send password reset email:', emailError.message);
+      console.error('Full error:', emailError);
     }
 
     res.status(200).json({ 
